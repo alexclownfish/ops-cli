@@ -61,6 +61,12 @@ var batchExecCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		command := args[0]
 		
+		// 验证：配置文件或命令行参数至少提供一个
+		if configFile == "" && len(hosts) == 0 {
+			fmt.Println("❌ 错误: 必须提供配置文件(-c)或服务器列表(-L)")
+			os.Exit(1)
+		}
+		
 		// 如果指定了配置文件，从配置文件读取服务器列表
 		if configFile != "" {
 			cfg, err := config.LoadConfig(configFile)
@@ -125,8 +131,7 @@ func init() {
 	batchExecCmd.Flags().StringVarP(&batchKeyPath, "batch-key", "K", "", "私钥路径")
 	batchExecCmd.Flags().StringVar(&batchKeyPass, "batch-key-pass", "", "私钥密码")
 	batchExecCmd.Flags().IntVar(&parallel, "parallel", 10, "并发数")
-	batchExecCmd.MarkFlagRequired("hosts")
-	batchExecCmd.MarkFlagRequired("batch-password")
+	// 配置文件和命令行参数二选一，不强制要求
 	
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(batchExecCmd)

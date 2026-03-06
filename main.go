@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 	"github.com/spf13/cobra"
 	"ops-cli/pkg/ssh"
 	"ops-cli/pkg/config"
@@ -150,7 +151,17 @@ func init() {
 	showCmd.MarkFlagRequired("key")
 	
 	passwdCmd.AddCommand(saveCmd)
+	listCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	listCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	listCmd.MarkFlagRequired("key")
+	
 	passwdCmd.AddCommand(showCmd)
+	resetBatchCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	resetBatchCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	resetBatchCmd.MarkFlagRequired("key")
+	
+	passwdCmd.AddCommand(listCmd)
+	passwdCmd.AddCommand(resetBatchCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -253,5 +264,82 @@ var showCmd = &cobra.Command{
 		fmt.Printf("用户: %s\n", srv.User)
 		fmt.Printf("密码: %s\n", pwd)
 		fmt.Printf("创建时间: %s\n", srv.CreatedAt.Format("2006-01-02 15:04:05"))
+	},
+}
+
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "列出所有服务器",
+	Run: func(cmd *cobra.Command, args []string) {
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		servers, err := store.List()
+		if err != nil {
+			fmt.Printf("❌ 查询失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		if len(servers) == 0 {
+			fmt.Println("暂无服务器")
+			return
+		}
+		
+		fmt.Printf("总共 %d 台服务器:\n\n", len(servers))
+		for _, srv := range servers {
+			fmt.Printf("ID: %s\n", srv.ID)
+			fmt.Printf("  名称: %s\n", srv.Name)
+			fmt.Printf("  地址: %s\n", srv.Host)
+			fmt.Printf("  用户: %s\n", srv.User)
+			fmt.Printf("  更新: %s\n\n", srv.UpdatedAt.Format("2006-01-02 15:04:05"))
+		}
+	},
+}
+
+var resetBatchCmd = &cobra.Command{
+	Use:   "reset-batch",
+	Short: "批量改密",
+	Run: func(cmd *cobra.Command, args []string) {
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		servers, err := store.List()
+		if err != nil {
+			fmt.Printf("❌ 查询失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("开始批量改密，共 %d 台服务器\n\n", len(servers))
+		
+		for _, srv := range servers {
+			fmt.Printf("处理: %s (%s)\n", srv.ID, srv.Host)
+			
+			// 获取当前密码
+			_, oldPwd, _ := store.Get(srv.ID)
+			
+			// 生成新密码
+			newPwd, _ := password.Generate(24)
+			
+			// 改密
+			err := password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+			if err != nil {
+				fmt.Printf("  ❌ 改密失败: %v\n\n", err)
+				continue
+			}
+			
+			// 更新数据库
+			srv.UpdatedAt = time.Now()
+			store.Save(srv, newPwd)
+			
+			fmt.Printf("  ✅ 改密成功\n\n")
+		}
 	},
 }

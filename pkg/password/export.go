@@ -2,6 +2,7 @@ package password
 
 import (
 	"os"
+	"time"
 	"github.com/tobischo/gokeepasslib/v3"
 	"github.com/tobischo/gokeepasslib/v3/wrappers"
 )
@@ -10,9 +11,15 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 	// 创建新数据库
 	db := gokeepasslib.NewDatabase()
 	
-	// 创建密码组
+	// 创建根组
 	rootGroup := gokeepasslib.NewGroup()
-	rootGroup.Name = "ops-cli-passwords"
+	rootGroup.Name = "Root"
+	rootGroup.UUID = gokeepasslib.NewUUID()
+	
+	// 创建密码组
+	passwordGroup := gokeepasslib.NewGroup()
+	passwordGroup.Name = "ops-cli-passwords"
+	passwordGroup.UUID = gokeepasslib.NewUUID()
 	
 	// 添加条目
 	for _, srv := range servers {
@@ -22,6 +29,7 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 		}
 		
 		entry := gokeepasslib.NewEntry()
+		entry.UUID = gokeepasslib.NewUUID()
 		entry.Values = []gokeepasslib.ValueData{
 			{Key: "Title", Value: gokeepasslib.V{Content: srv.Name}},
 			{Key: "UserName", Value: gokeepasslib.V{Content: srv.User}},
@@ -29,11 +37,18 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 			{Key: "URL", Value: gokeepasslib.V{Content: "ssh://" + srv.Host}},
 			{Key: "Notes", Value: gokeepasslib.V{Content: srv.ID}},
 		}
-		rootGroup.Entries = append(rootGroup.Entries, entry)
+		passwordGroup.Entries = append(passwordGroup.Entries, entry)
 	}
 	
-	// 添加到数据库
-	db.Content.Root.Groups = append(db.Content.Root.Groups, rootGroup)
+	// 将密码组添加到根组
+	rootGroup.Groups = append(rootGroup.Groups, passwordGroup)
+	
+	// 将根组添加到数据库
+	db.Content.Root.Groups = []gokeepasslib.Group{rootGroup}
+	
+	// 设置元数据
+	db.Content.Meta.DatabaseName = "ops-cli passwords"
+	db.Content.Meta.DatabaseNameChanged = &wrappers.TimeWrapper{Time: time.Now()}
 	
 	// 设置凭据
 	db.Credentials = gokeepasslib.NewPasswordCredentials(kdbxPassword)

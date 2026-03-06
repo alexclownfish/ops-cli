@@ -1,0 +1,16 @@
+﻿servers:
+  - name: server1
+    host: 192.168.1.100
+    port: 22
+    user: root
+    password: password123
+  - name: server2
+    host: 192.168.1.101
+    port: 22
+    user: root
+    password: password123
+  - name: server3
+    host: 192.168.1.102
+    port: 22
+    user: admin
+    password: admin123

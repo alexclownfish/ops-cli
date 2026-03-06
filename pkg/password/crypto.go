@@ -10,7 +10,12 @@ import (
 )
 
 func Encrypt(plaintext, key string) (string, error) {
-	keyBytes := []byte(key)
+	// 尝试Base64解码密钥
+	keyBytes, err := base64.StdEncoding.DecodeString(key)
+	if err != nil || len(keyBytes) != 32 {
+		// 如果解码失败或长度不对，直接使用原始字符串
+		keyBytes = []byte(key)
+	}
 	if len(keyBytes) != 32 {
 		return "", fmt.Errorf("密钥长度必须为32字节")
 	}
@@ -34,7 +39,12 @@ func Encrypt(plaintext, key string) (string, error) {
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 func Decrypt(ciphertext, key string) (string, error) {
-	keyBytes := []byte(key)
+	// 尝试Base64解码密钥
+	keyBytes, err := base64.StdEncoding.DecodeString(key)
+	if err != nil || len(keyBytes) != 32 {
+		// 如果解码失败或长度不对，直接使用原始字符串
+		keyBytes = []byte(key)
+	}
 	if len(keyBytes) != 32 {
 		return "", fmt.Errorf("密钥长度必须为32字节")
 	}

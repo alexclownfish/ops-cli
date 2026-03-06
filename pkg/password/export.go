@@ -33,7 +33,7 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 		entry.Values = []gokeepasslib.ValueData{
 			{Key: "Title", Value: gokeepasslib.V{Content: srv.Name}},
 			{Key: "UserName", Value: gokeepasslib.V{Content: srv.User}},
-			{Key: "Password", Value: gokeepasslib.V{Content: plainPwd, Protected: wrappers.NewBoolWrapper(true)}},
+			{Key: "Password", Value: gokeepasslib.V{Content: plainPwd}},
 			{Key: "URL", Value: gokeepasslib.V{Content: "ssh://" + srv.Host}},
 			{Key: "Notes", Value: gokeepasslib.V{Content: srv.ID}},
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"ops-cli/pkg/ssh"
 	"ops-cli/pkg/config"
+	"ops-cli/pkg/password"
 )
 
 var (
@@ -16,7 +17,7 @@ var (
 	host     string
 	port     int
 	user     string
-	password string
+	passwd string
 	hosts    []string
 	batchPort int
 	batchUser string
@@ -36,7 +37,7 @@ var execCmd = &cobra.Command{
 	Short: "SSH执行命令",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		client := ssh.NewClient(host, port, user, password, keyPath, keyPass)
+		client := ssh.NewClient(host, port, user, passwd, keyPath, keyPass)
 		fmt.Printf("连接到 %s@%s:%d...\n", user, host, port)
 		if err := client.Connect(); err != nil {
 			fmt.Printf("❌ 连接失败: %v\n", err)
@@ -117,7 +118,7 @@ func init() {
 	execCmd.Flags().StringVarP(&host, "host", "H", "", "服务器地址")
 	execCmd.Flags().IntVarP(&port, "port", "P", 22, "SSH端口")
 	execCmd.Flags().StringVarP(&user, "user", "u", "root", "用户名")
-	execCmd.Flags().StringVarP(&password, "password", "p", "", "密码")
+	execCmd.Flags().StringVarP(&passwd, "password", "p", "", "密码")
 	execCmd.Flags().StringVarP(&keyPath, "key", "i", "", "私钥路径")
 	execCmd.Flags().StringVar(&keyPass, "key-pass", "", "私钥密码")
 	execCmd.MarkFlagRequired("host")
@@ -135,6 +136,9 @@ func init() {
 	
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(batchExecCmd)
+	
+	passwdCmd.AddCommand(generateCmd)
+	rootCmd.AddCommand(passwdCmd)
 }
 
 func main() {
@@ -142,4 +146,23 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+var passwdCmd = &cobra.Command{
+	Use:   "passwd",
+	Short: "密码管理",
+	Long:  `密码生成、加密存储、自动轮换`,
+}
+
+var generateCmd = &cobra.Command{
+	Use:   "generate",
+	Short: "生成强密码",
+	Run: func(cmd *cobra.Command, args []string) {
+		pwd, err := password.Generate(24)
+		if err != nil {
+			fmt.Printf("❌ 生成失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ 生成密码: %s\n", pwd)
+	},
 }

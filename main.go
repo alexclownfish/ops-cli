@@ -169,7 +169,12 @@ func init() {
 	exportCmd.MarkFlagRequired("kdbx-password")
 	
 	passwdCmd.AddCommand(resetBatchCmd)
+	resetCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	resetCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	resetCmd.MarkFlagRequired("key")
+	
 	passwdCmd.AddCommand(exportCmd)
+	passwdCmd.AddCommand(resetCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -375,5 +380,56 @@ var exportCmd = &cobra.Command{
 		}
 		
 		fmt.Printf("✅ 已导出 %d 台服务器到 %s\n", len(servers), outputPath)
+	},
+}
+
+var resetCmd = &cobra.Command{
+	Use:   "reset [server-id]",
+	Short: "修改密码",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		serverID := args[0]
+		
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		srv, oldPwd, err := store.Get(serverID)
+		if err != nil || srv == nil {
+			fmt.Printf("❌ 未找到服务器: %s\n", serverID)
+			os.Exit(1)
+		}
+		
+		newPwd, _ := password.Generate(24)
+		fmt.Printf("生成新密码: %s\n", newPwd)
+		
+		if srv.ResetMethod == "virsh" {
+			fmt.Printf("使用virsh方式改密...\n")
+			err = password.ResetPasswordVirsh(
+				srv.HypervisorHost,
+				srv.HypervisorPort,
+				srv.HypervisorUser,
+				srv.HypervisorPass,
+				srv.InstanceID,
+				srv.User,
+				newPwd,
+			)
+		} else {
+			fmt.Printf("使用SSH方式改密...\n")
+			err = password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+		}
+		
+		if err != nil {
+			fmt.Printf("❌ 改密失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		srv.UpdatedAt = time.Now()
+		store.Save(*srv, newPwd)
+		
+		fmt.Printf("✅ 改密成功\n")
 	},
 }

@@ -14,6 +14,14 @@ type Server struct {
 	PasswordEncrypted string    `json:"password_encrypted"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
+	
+	// virsh相关
+	InstanceID       string `json:"instance_id,omitempty"`
+	HypervisorHost   string `json:"hypervisor_host,omitempty"`
+	HypervisorPort   int    `json:"hypervisor_port,omitempty"`
+	HypervisorUser   string `json:"hypervisor_user,omitempty"`
+	HypervisorPass   string `json:"hypervisor_pass,omitempty"`
+	ResetMethod      string `json:"reset_method,omitempty"` // ssh | virsh
 }
 
 type Store struct {

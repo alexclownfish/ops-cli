@@ -29,3 +29,20 @@ func VerifyPassword(host string, port int, user, password string) error {
 	client.Close()
 	return nil
 }
+
+func ResetPasswordVirsh(hypervisorHost string, hypervisorPort int, hypervisorUser, hypervisorPassword string, instanceID, vmUser, newPassword string) error {
+	client := ssh.NewClient(hypervisorHost, hypervisorPort, hypervisorUser, hypervisorPassword, "", "")
+	
+	if err := client.Connect(); err != nil {
+		return fmt.Errorf("连接物理机失败: %v", err)
+	}
+	defer client.Close()
+	
+	cmd := fmt.Sprintf("virsh set-user-password %s %s %s", instanceID, vmUser, newPassword)
+	_, err := client.Execute(cmd)
+	if err != nil {
+		return fmt.Errorf("virsh改密失败: %v", err)
+	}
+	
+	return nil
+}

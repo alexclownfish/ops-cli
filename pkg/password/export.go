@@ -7,11 +7,14 @@ import (
 )
 
 func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword string) error {
+	// 创建新数据库
 	db := gokeepasslib.NewDatabase()
 	
+	// 创建密码组
 	rootGroup := gokeepasslib.NewGroup()
 	rootGroup.Name = "ops-cli-passwords"
 	
+	// 添加条目
 	for _, srv := range servers {
 		plainPwd, err := Decrypt(srv.PasswordEncrypted, masterKey)
 		if err != nil {
@@ -19,19 +22,23 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 		}
 		
 		entry := gokeepasslib.NewEntry()
-		entry.Values = append(entry.Values,
-			gokeepasslib.ValueData{Key: "Title", Value: gokeepasslib.V{Content: srv.Name}},
-			gokeepasslib.ValueData{Key: "UserName", Value: gokeepasslib.V{Content: srv.User}},
-			gokeepasslib.ValueData{Key: "Password", Value: gokeepasslib.V{Content: plainPwd, Protected: wrappers.NewBoolWrapper(true)}},
-			gokeepasslib.ValueData{Key: "URL", Value: gokeepasslib.V{Content: "ssh://" + srv.Host}},
-			gokeepasslib.ValueData{Key: "Notes", Value: gokeepasslib.V{Content: srv.ID}},
-		)
+		entry.Values = []gokeepasslib.ValueData{
+			{Key: "Title", Value: gokeepasslib.V{Content: srv.Name}},
+			{Key: "UserName", Value: gokeepasslib.V{Content: srv.User}},
+			{Key: "Password", Value: gokeepasslib.V{Content: plainPwd, Protected: wrappers.NewBoolWrapper(true)}},
+			{Key: "URL", Value: gokeepasslib.V{Content: "ssh://" + srv.Host}},
+			{Key: "Notes", Value: gokeepasslib.V{Content: srv.ID}},
+		}
 		rootGroup.Entries = append(rootGroup.Entries, entry)
 	}
 	
+	// 添加到数据库
 	db.Content.Root.Groups = append(db.Content.Root.Groups, rootGroup)
+	
+	// 设置凭据
 	db.Credentials = gokeepasslib.NewPasswordCredentials(kdbxPassword)
 	
+	// 写入文件
 	file, err := os.Create(outputPath)
 	if err != nil {
 		return err

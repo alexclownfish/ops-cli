@@ -300,3 +300,561 @@ MIT
 - 2026-03-04: 初始版本
 
 **Star ⭐ 如果这个项目对你有帮助！**
+
+## 📖 详细使用手册
+
+### 一、密码管理完整工作流程
+
+#### 步骤1：初始化（首次使用）
+
+**1.1 生成主密钥**
+```bash
+# 方法1：使用openssl生成
+MASTER_KEY=$(openssl rand -base64 32)
+echo $MASTER_KEY
+
+# 方法2：使用ops-cli生成（即将支持）
+# ops passwd init-key
+
+# 保存主密钥到安全位置
+echo $MASTER_KEY > ~/.ops-master-key
+chmod 600 ~/.ops-master-key
+```
+
+**1.2 设置环境变量（推荐）**
+```bash
+# 添加到 ~/.bashrc 或 ~/.zshrc
+export OPS_MASTER_KEY="your-master-key-here"
+export OPS_DB_PATH="$HOME/.ops-cli/passwords.db"
+
+# 重新加载配置
+source ~/.bashrc
+```
+
+#### 步骤2：添加服务器
+
+**2.1 添加普通Linux服务器（SSH改密）**
+```bash
+ops passwd save web-01 \
+  -H 192.168.1.100 \
+  -u root \
+  --key $OPS_MASTER_KEY
+
+# 输出示例：
+# ✅ 生成新密码
+# ✅ 密码已保存到数据库
+# 服务器: web-01
+# 密码: xT9#mK2_pLqW8@nR5vYzA3Bc
+```
+
+**2.2 添加OpenStack虚拟机（virsh改密）**
+```bash
+# 注意：virsh改密需要手动编辑数据库或使用配置文件
+# 当前版本需要先保存，然后手动修改数据库中的字段：
+# - reset_method: "virsh"
+# - instance_id: "虚拟机实例ID"
+# - hypervisor_host: "物理机IP"
+# - hypervisor_port: 22
+# - hypervisor_user: "root"
+# - hypervisor_pass: "物理机密码"
+```
+
+#### 步骤3：查看和管理密码
+
+**3.1 查看单个服务器密码**
+```bash
+ops passwd show web-01 --key $OPS_MASTER_KEY
+
+# 输出示例：
+# 服务器ID: web-01
+# 名称: web-01
+# 地址: 192.168.1.100
+# 用户: root
+# 密码: xT9#mK2_pLqW8@nR5vYzA3Bc
+# 创建时间: 2026-03-06 14:00:00
+```
+
+**3.2 列出所有服务器**
+```bash
+ops passwd list --key $OPS_MASTER_KEY
+
+# 输出示例：
+# 总共 3 台服务器:
+#
+# ID: web-01
+#   名称: web-01
+#   地址: 192.168.1.100
+#   用户: root
+#   更新: 2026-03-06 14:00:00
+#
+# ID: web-02
+#   名称: web-02
+#   地址: 192.168.1.101
+#   用户: root
+#   更新: 2026-03-06 14:05:00
+```
+
+#### 步骤4：修改密码
+
+**4.1 单机改密**
+```bash
+ops passwd reset web-01 --key $OPS_MASTER_KEY
+
+# 输出示例：
+# 生成新密码: yH7@nK9_qMwP2#vR6xZaB4Cd
+# 使用SSH方式改密...
+# ✅ 改密成功
+```
+
+**4.2 批量改密**
+```bash
+ops passwd reset-batch --key $OPS_MASTER_KEY
+
+# 输出示例：
+# 开始批量改密，共 3 台服务器
+#
+# 处理: web-01 (192.168.1.100)
+#   ✅ 改密成功
+#
+# 处理: web-02 (192.168.1.101)
+#   ✅ 改密成功
+#
+# 处理: web-03 (192.168.1.102)
+#   ✅ 改密成功
+```
+
+#### 步骤5：导出备份
+
+**5.1 导出到KeePassXC**
+```bash
+ops passwd export \
+  --key $OPS_MASTER_KEY \
+  --kdbx-password "your-keepass-password" \
+  --output ~/backup/passwords-$(date +%Y%m%d).kdbx
+
+# 输出示例：
+# ✅ 已导出 3 台服务器到 /home/user/backup/passwords-20260306.kdbx
+```
+
+**5.2 在KeePassXC中导入**
+```bash
+# 1. 打开KeePassXC
+# 2. 文件 -> 打开数据库
+# 3. 选择 passwords-20260306.kdbx
+# 4. 输入密码: your-keepass-password
+# 5. 完成！所有密码已导入
+```
+
+### 二、SSH管理详细说明
+
+#### 2.1 单机执行
+
+**基础用法**
+```bash
+# 密码认证
+ops exec "uptime" -H 192.168.1.100 -u root -p password
+
+# 密钥认证
+ops exec "df -h" -H 192.168.1.100 -u root -i ~/.ssh/id_rsa
+
+# 带密码的密钥
+ops exec "free -m" -H 192.168.1.100 -u root -i ~/.ssh/id_rsa --key-pass mypass
+```
+
+**高级用法**
+```bash
+# 执行多条命令
+ops exec "cd /var/log && tail -n 20 syslog" -H 192.168.1.100 -u root -p pass
+
+# 执行脚本
+ops exec "bash /tmp/deploy.sh" -H 192.168.1.100 -u root -i ~/.ssh/id_rsa
+
+# 查看系统信息
+ops exec "uname -a && cat /etc/os-release" -H 192.168.1.100 -u root -p pass
+```
+
+#### 2.2 批量执行
+
+**方式1：命令行指定服务器列表**
+```bash
+ops batch "uptime" \
+  -L 192.168.1.100,192.168.1.101,192.168.1.102 \
+  -U root \
+  -P password
+
+# 输出示例：
+# ✅ 192.168.1.100:
+#  14:30:25 up 10 days,  3:45,  1 user,  load average: 0.15, 0.10, 0.08
+# ---
+# ✅ 192.168.1.101:
+#  14:30:26 up 5 days,  2:30,  2 users,  load average: 0.25, 0.20, 0.15
+# ---
+```
+
+**方式2：使用配置文件**
+```bash
+# 创建 servers.yaml
+cat > servers.yaml << EOF
+servers:
+  - name: web-server-1
+    host: 192.168.1.100
+    port: 22
+    user: root
+    password: password123
+  - name: web-server-2
+    host: 192.168.1.101
+    port: 22
+    user: root
+    password: password456
+  - name: db-server
+    host: 192.168.1.102
+    port: 22
+    user: admin
+    password: admin123
+EOF
+
+# 执行批量命令
+ops batch "df -h" -c servers.yaml
+```
+
+**方式3：使用密钥批量执行**
+```bash
+ops batch "systemctl status nginx" \
+  -L server1,server2,server3 \
+  -U root \
+  -K ~/.ssh/id_rsa \
+  --batch-key-pass mypass
+```
+
+**控制并发数**
+```bash
+# 默认并发10个
+ops batch "uptime" -c servers.yaml
+
+# 设置并发数为5
+ops batch "uptime" -c servers.yaml --parallel 5
+
+# 串行执行（并发数为1）
+ops batch "systemctl restart nginx" -c servers.yaml --parallel 1
+```
+
+### 三、常见问题（FAQ）
+
+#### Q1: 如何生成主密钥？
+```bash
+# 使用openssl生成32字节密钥
+openssl rand -base64 32
+
+# 或者使用Python
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+```
+
+#### Q2: 主密钥丢失了怎么办？
+**答：** 主密钥丢失后，数据库中的密码将无法解密。建议：
+- 将主密钥保存在多个安全位置
+- 定期导出到KeePassXC备份
+- 使用密码管理器（如1Password）保存主密钥
+
+#### Q3: 如何备份密码数据库？
+```bash
+# 备份数据库文件
+cp passwords.db passwords-backup-$(date +%Y%m%d).db
+
+# 或导出到KeePassXC
+ops passwd export --key $KEY --kdbx-password backup123 --output backup.kdbx
+```
+
+#### Q4: 批量改密失败了部分服务器怎么办？
+**答：** 
+- 查看错误日志，确认失败原因
+- 对失败的服务器单独执行 `ops passwd reset`
+- 检查网络连接和SSH权限
+
+#### Q5: 如何在OpenStack环境使用virsh改密？
+**答：** 当前版本需要手动配置，步骤：
+1. 先用 `ops passwd save` 保存服务器
+2. 手动编辑数据库，添加virsh相关字段
+3. 执行 `ops passwd reset` 自动识别virsh方式
+
+#### Q6: 密码数据库可以多人共享吗？
+**答：** 可以，但需要注意：
+- 所有人使用相同的主密钥
+- 数据库文件权限设置为600
+- 建议使用Git管理数据库（加密后）
+
+#### Q7: 如何迁移到新机器？
+```bash
+# 在旧机器上
+cp passwords.db /path/to/backup/
+echo $OPS_MASTER_KEY > master-key.txt
+
+# 在新机器上
+cp /path/to/backup/passwords.db ~/.ops-cli/
+export OPS_MASTER_KEY=$(cat master-key.txt)
+ops passwd list --key $OPS_MASTER_KEY
+```
+
+#### Q8: SSH连接超时怎么办？
+**答：** 
+- 检查网络连接：`ping <host>`
+- 检查SSH端口：`telnet <host> 22`
+- 增加超时时间（当前固定10秒，未来版本支持配置）
+- 检查防火墙规则
+
+### 四、最佳实践
+
+#### 4.1 主密钥管理
+```bash
+# ✅ 推荐：使用环境变量
+export OPS_MASTER_KEY="your-key"
+
+# ✅ 推荐：保存到文件（权限600）
+echo "your-key" > ~/.ops-master-key
+chmod 600 ~/.ops-master-key
+export OPS_MASTER_KEY=$(cat ~/.ops-master-key)
+
+# ❌ 不推荐：直接在命令行输入（会留在历史记录）
+ops passwd list --key "your-key-in-plain-text"
+```
+
+#### 4.2 密码轮换策略
+```bash
+# 定期改密（建议每90天）
+# 方法1：手动执行
+ops passwd reset-batch --key $KEY
+
+# 方法2：设置cron任务（未来版本支持）
+# 0 2 1 */3 * ops passwd reset-batch --key $KEY
+```
+
+#### 4.3 备份策略
+```bash
+# 每周备份一次
+#!/bin/bash
+DATE=$(date +%Y%m%d)
+ops passwd export \
+  --key $OPS_MASTER_KEY \
+  --kdbx-password "backup-password" \
+  --output ~/backups/passwords-$DATE.kdbx
+
+# 保留最近4周的备份
+find ~/backups -name "passwords-*.kdbx" -mtime +28 -delete
+```
+
+#### 4.4 安全建议
+```bash
+# 1. 数据库文件权限
+chmod 600 passwords.db
+
+# 2. 主密钥文件权限
+chmod 600 ~/.ops-master-key
+
+# 3. 定期更换主密钥（高级操作，需要重新加密所有密码）
+# 当前版本不支持，建议导出后重新导入
+
+# 4. 审计日志（未来版本支持）
+# ops passwd audit --since 7d
+```
+
+#### 4.5 团队协作
+```bash
+# 1. 使用Git管理配置文件
+git init
+git add servers.yaml
+git commit -m "Add server config"
+
+# 2. 不要提交密码数据库
+echo "passwords.db" >> .gitignore
+echo "*.kdbx" >> .gitignore
+
+# 3. 团队共享主密钥（使用密码管理器）
+# 将主密钥保存在1Password/LastPass等团队密码管理器中
+```
+
+### 五、故障排查
+
+#### 5.1 常见错误
+
+**错误1：连接失败**
+```bash
+❌ 连接失败: dial tcp 192.168.1.100:22: i/o timeout
+
+# 解决方法：
+# 1. 检查网络连接
+ping 192.168.1.100
+
+# 2. 检查SSH端口
+telnet 192.168.1.100 22
+
+# 3. 检查防火墙
+sudo iptables -L | grep 22
+```
+
+**错误2：认证失败**
+```bash
+❌ 连接失败: ssh: handshake failed: ssh: unable to authenticate
+
+# 解决方法：
+# 1. 检查密码是否正确
+# 2. 检查用户名是否正确
+# 3. 检查密钥文件权限
+chmod 600 ~/.ssh/id_rsa
+
+# 4. 检查密钥是否正确
+ssh -i ~/.ssh/id_rsa root@192.168.1.100
+```
+
+**错误3：改密失败**
+```bash
+❌ 改密失败: chpasswd: (user root) pam_chauthtok() failed
+
+# 解决方法：
+# 1. 检查是否有root权限
+# 2. 检查PAM配置
+# 3. 手动测试chpasswd命令
+echo "root:newpassword" | sudo chpasswd
+```
+
+**错误4：数据库打开失败**
+```bash
+❌ 打开数据库失败: timeout
+
+# 解决方法：
+# 1. 检查数据库文件是否存在
+ls -la passwords.db
+
+# 2. 检查文件权限
+chmod 600 passwords.db
+
+# 3. 检查是否被其他进程占用
+lsof passwords.db
+```
+
+#### 5.2 调试技巧
+
+**启用详细日志（未来版本支持）**
+```bash
+# ops passwd reset vm-001 --key $KEY --verbose
+# ops batch "uptime" -c servers.yaml --debug
+```
+
+**测试SSH连接**
+```bash
+# 使用系统ssh命令测试
+ssh -v root@192.168.1.100
+
+# 测试密钥认证
+ssh -i ~/.ssh/id_rsa -v root@192.168.1.100
+```
+
+### 六、高级用法
+
+#### 6.1 脚本集成
+
+**Bash脚本示例**
+```bash
+#!/bin/bash
+# auto-deploy.sh - 自动部署脚本
+
+set -e
+
+# 配置
+MASTER_KEY=$(cat ~/.ops-master-key)
+SERVERS="web-01,web-02,web-03"
+
+# 1. 批量执行部署命令
+echo "开始部署..."
+ops batch "cd /app && git pull && systemctl restart app" \
+  -L $SERVERS \
+  -U deploy \
+  -K ~/.ssh/deploy_key
+
+# 2. 验证部署结果
+echo "验证部署..."
+ops batch "systemctl status app | grep Active" \
+  -L $SERVERS \
+  -U deploy \
+  -K ~/.ssh/deploy_key
+
+echo "部署完成！"
+```
+
+**Python脚本示例**
+```python
+#!/usr/bin/env python3
+# auto-reset-password.py - 自动改密脚本
+
+import subprocess
+import os
+from datetime import datetime
+
+def reset_passwords():
+    master_key = os.environ.get('OPS_MASTER_KEY')
+    if not master_key:
+        print("错误: 未设置OPS_MASTER_KEY环境变量")
+        return
+    
+    # 执行批量改密
+    result = subprocess.run([
+        'ops', 'passwd', 'reset-batch',
+        '--key', master_key
+    ], capture_output=True, text=True)
+    
+    # 记录日志
+    with open('password-reset.log', 'a') as f:
+        f.write(f"{datetime.now()}: {result.stdout}\n")
+    
+    print("改密完成！")
+
+if __name__ == '__main__':
+    reset_passwords()
+```
+
+#### 6.2 定时任务
+
+**Cron任务示例**
+```bash
+# 编辑crontab
+crontab -e
+
+# 每月1号凌晨2点执行批量改密
+0 2 1 * * /usr/local/bin/ops passwd reset-batch --key $(cat ~/.ops-master-key) >> /var/log/ops-reset.log 2>&1
+
+# 每周日凌晨3点备份密码数据库
+0 3 * * 0 /usr/local/bin/ops passwd export --key $(cat ~/.ops-master-key) --kdbx-password backup123 --output ~/backups/passwords-$(date +\%Y\%m\%d).kdbx
+```
+
+#### 6.3 与其他工具集成
+
+**与Ansible集成**
+```yaml
+# playbook.yml
+- name: 使用ops-cli批量改密
+  hosts: localhost
+  tasks:
+    - name: 执行批量改密
+      shell: ops passwd reset-batch --key {{ master_key }}
+      register: result
+    
+    - name: 显示结果
+      debug:
+        msg: "{{ result.stdout }}"
+```
+
+**与Jenkins集成**
+```groovy
+// Jenkinsfile
+pipeline {
+    agent any
+    environment {
+        OPS_MASTER_KEY = credentials('ops-master-key')
+    }
+    stages {
+        stage('Reset Passwords') {
+            steps {
+                sh 'ops passwd reset-batch --key $OPS_MASTER_KEY'
+            }
+        }
+    }
+}
+```

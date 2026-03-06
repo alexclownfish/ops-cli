@@ -11,6 +11,8 @@ import (
 
 var (
 	configFile string
+	keyPath    string
+	keyPass    string
 	host     string
 	port     int
 	user     string
@@ -19,6 +21,8 @@ var (
 	batchPort int
 	batchUser string
 	batchPass string
+	batchKeyPath string
+	batchKeyPass string
 	parallel int
 )
 
@@ -32,7 +36,7 @@ var execCmd = &cobra.Command{
 	Short: "SSH执行命令",
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		client := ssh.NewClient(host, port, user, password)
+		client := ssh.NewClient(host, port, user, password, keyPath, keyPass)
 		fmt.Printf("连接到 %s@%s:%d...\n", user, host, port)
 		if err := client.Connect(); err != nil {
 			fmt.Printf("❌ 连接失败: %v\n", err)
@@ -80,7 +84,7 @@ var batchExecCmd = &cobra.Command{
 			wg.Add(1)
 			go func(host string) {
 				defer wg.Done()
-				client := ssh.NewClient(host, batchPort, batchUser, batchPass)
+				client := ssh.NewClient(host, batchPort, batchUser, batchPass, batchKeyPath, batchKeyPass)
 				if err := client.Connect(); err != nil {
 					results <- fmt.Sprintf("❌ %s: 连接失败 - %v", host, err)
 					return
@@ -108,6 +112,8 @@ func init() {
 	execCmd.Flags().IntVarP(&port, "port", "P", 22, "SSH端口")
 	execCmd.Flags().StringVarP(&user, "user", "u", "root", "用户名")
 	execCmd.Flags().StringVarP(&password, "password", "p", "", "密码")
+	execCmd.Flags().StringVarP(&keyPath, "key", "i", "", "私钥路径")
+	execCmd.Flags().StringVar(&keyPass, "key-pass", "", "私钥密码")
 	execCmd.MarkFlagRequired("host")
 	execCmd.MarkFlagRequired("password")
 	
@@ -116,6 +122,8 @@ func init() {
 	batchExecCmd.Flags().IntVarP(&batchPort, "batch-port", "T", 22, "SSH端口")
 	batchExecCmd.Flags().StringVarP(&batchUser, "batch-user", "U", "root", "用户名")
 	batchExecCmd.Flags().StringVarP(&batchPass, "batch-password", "P", "", "密码")
+	batchExecCmd.Flags().StringVarP(&batchKeyPath, "batch-key", "K", "", "私钥路径")
+	batchExecCmd.Flags().StringVar(&batchKeyPass, "batch-key-pass", "", "私钥密码")
 	batchExecCmd.Flags().IntVar(&parallel, "parallel", 10, "并发数")
 	batchExecCmd.MarkFlagRequired("hosts")
 	batchExecCmd.MarkFlagRequired("batch-password")

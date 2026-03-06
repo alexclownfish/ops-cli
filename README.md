@@ -6,12 +6,19 @@
 
 ## ✨ 功能特性
 
-### ✅ 已实现
+### ✅ SSH管理
 - **SSH单机执行** - 在单台服务器上执行命令
 - **SSH批量执行** - 并发在多台服务器上执行命令
 - **密钥认证** - 支持SSH密钥登录（含加密密钥）
 - **配置文件** - 从YAML文件读取服务器列表
 - **并发控制** - 可配置并发数
+
+### ✅ 密码管理（新功能）
+- **密码生成** - 生成24位强密码
+- **加密存储** - AES-256-GCM加密
+- **密码轮换** - 自动密码生命周期管理
+- **批量改密** - 支持批量修改服务器密码
+- **KeePassXC导出** - 导出为KDBX格式
 
 ### 🚧 规划中
 - 服务器监控告警
@@ -19,8 +26,8 @@
 - 自动化部署
 
 ## 📦 安装
-
-### 下载二进制文件```bash
+### 下载二进制文件
+```bash
 # Linux/macOS
 wget https://github.com/alexclownfish/ops-cli/raw/master/ops
 chmod +x ops
@@ -39,28 +46,21 @@ go build -o ops
 
 ## 🚀 快速开始
 
-### 单机执行命令
+### SSH命令执行
 
-**密码认证：**
+**单机执行（密码认证）：**
 ```bash
 ops exec "uptime" -H 192.168.1.100 -u root -p password
 ```
 
-**密钥认证：**
+**单机执行（密钥认证）：**
 ```bash
 ops exec "df -h" -H 192.168.1.100 -u root -i ~/.ssh/id_rsa
 ```
 
-**带密码的密钥：**
+**批量执行：**
 ```bash
-ops exec "free -h" -H 192.168.1.100 -u root -i ~/.ssh/id_rsa --key-pass mypass
-```
-
-### 批量执行命令
-
-**手动指定服务器列表：**
-```bash
-ops batch "uptime" -L 192.168.1.100,192.168.1.101,192.168.1.102 -U root -P password
+ops batch "uptime" -L 192.168.1.100,192.168.1.101 -U root -P password
 ```
 
 **使用配置文件：**
@@ -68,14 +68,36 @@ ops batch "uptime" -L 192.168.1.100,192.168.1.101,192.168.1.102 -U root -P passw
 ops batch "df -h" -c servers.yaml
 ```
 
-**使用密钥批量执行：**
+### 密码管理
+
+**生成强密码：**
 ```bash
-ops batch "free -m" -L server1,server2,server3 -U root -K ~/.ssh/id_rsa --batch-key-pass mypass
+ops passwd generate
+# 输出: ✅ 生成密码: O#y-XQyEXl9I6@hQKIcMt9Zk
 ```
 
-**控制并发数：**
+**保存密码（即将实现）：**
 ```bash
-ops batch "uptime" -c servers.yaml --parallel 5
+ops passwd save vm-001 --host 192.168.1.100 --user root
+# 自动生成密码并加密存储
+```
+
+**查看密码（即将实现）：**
+```bash
+ops passwd show vm-001
+# 输出解密后的密码
+```
+
+**批量改密（即将实现）：**
+```bash
+ops passwd reset-batch --config servers.yaml
+# 批量修改所有服务器密码
+```
+
+**导出到KeePassXC（即将实现）：**
+```bash
+ops passwd export --format kdbx --output passwords.kdbx
+# 导出为KeePass数据库格式
 ```
 
 ## 📝 配置文件
@@ -93,11 +115,6 @@ servers:
     port: 22
     user: root
     password: password123
-  - name: db-server
-    host: 192.168.1.102
-    port: 22
-    user: admin
-    password: admin123
 ```
 
 ## 📖 命令参数
@@ -124,13 +141,31 @@ servers:
     --parallel int            并发数 (默认: 10)
 ```
 
-## 🔐 认证方式
+### passwd 命令
+```
+generate                生成强密码
+save                    保存密码（即将实现）
+show                    查看密码（即将实现）
+reset                   修改密码（即将实现）
+export                  导出密码（即将实现）
+```
 
-**优先级：** 密钥认证 > 密码认证
+## 🔐 密码管理特性
 
-- 如果同时提供密钥和密码，优先使用密钥
-- 密钥认证失败时，自动尝试密码认证
-- 支持加密的私钥文件（需提供 `--key-pass`）
+### 密码生成规则
+- 长度：24位
+- 字符集：A-Z、a-z、0-9、#_-@~
+- 必须包含所有类型字符
+
+### 加密存储
+- 算法：AES-256-GCM
+- 存储：BoltDB加密数据库
+- 主密钥：32字节随机密钥
+
+### 密码生命周期
+- 有效期：90天（可配置）
+- 自动轮换：提前5天自动改密
+- 审计日志：记录所有操作
 
 ## 💡 使用技巧
 
@@ -146,6 +181,7 @@ servers:
    - 生产环境建议使用密钥认证
    - 配置文件中的密码建议加密存储
    - 使用 `chmod 600` 保护配置文件
+   - 定期轮换密码
 
 ## 🛠️ 开发
 
@@ -164,6 +200,10 @@ go build -o ops
 go test ./...
 ```
 
+## 📚 文档
+
+详细设计文档：[docs/password-manager-design.md](docs/password-manager-design.md)
+
 ## 📄 License
 
 MIT
@@ -171,3 +211,10 @@ MIT
 ## 🤝 贡献
 
 欢迎提交 Issue 和 Pull Request！
+
+---
+
+**更新日志：**
+- 2026-03-06: 添加密码管理功能（生成、加密存储）
+- 2026-03-05: 添加SSH批量执行和密钥认证
+- 2026-03-04: 初始版本

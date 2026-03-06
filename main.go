@@ -137,7 +137,20 @@ func init() {
 	rootCmd.AddCommand(execCmd)
 	rootCmd.AddCommand(batchExecCmd)
 	
+	saveCmd.Flags().StringVarP(&host, "host", "H", "", "服务器地址")
+	saveCmd.Flags().StringVarP(&user, "user", "u", "root", "用户名")
+	saveCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	saveCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	saveCmd.MarkFlagRequired("host")
+	saveCmd.MarkFlagRequired("key")
+	
 	passwdCmd.AddCommand(generateCmd)
+	showCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	showCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	showCmd.MarkFlagRequired("key")
+	
+	passwdCmd.AddCommand(saveCmd)
+	passwdCmd.AddCommand(showCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -154,6 +167,11 @@ var passwdCmd = &cobra.Command{
 	Long:  `密码生成、加密存储、自动轮换`,
 }
 
+var (
+	dbPath     string
+	masterKey  string
+)
+
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "生成强密码",
@@ -164,5 +182,76 @@ var generateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		fmt.Printf("✅ 生成密码: %s\n", pwd)
+	},
+}
+
+var saveCmd = &cobra.Command{
+	Use:   "save [server-id]",
+	Short: "保存密码",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		serverID := args[0]
+		
+		// 生成新密码
+		newPassword, err := password.Generate(24)
+		if err != nil {
+			fmt.Printf("❌ 生成密码失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ 生成新密码\n")
+		
+		// 打开数据库
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		// 保存密码
+		srv := password.Server{
+			ID:   serverID,
+			Name: serverID,
+			Host: host,
+			User: user,
+		}
+		
+		if err := store.Save(srv, newPassword); err != nil {
+			fmt.Printf("❌ 保存失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ 密码已保存到数据库\n")
+		fmt.Printf("服务器: %s\n", serverID)
+		fmt.Printf("密码: %s\n", newPassword)
+	},
+}
+
+var showCmd = &cobra.Command{
+	Use:   "show [server-id]",
+	Short: "查看密码",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		serverID := args[0]
+		
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		srv, pwd, err := store.Get(serverID)
+		if err != nil || srv == nil {
+			fmt.Printf("❌ 未找到服务器: %s\n", serverID)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("服务器ID: %s\n", srv.ID)
+		fmt.Printf("名称: %s\n", srv.Name)
+		fmt.Printf("地址: %s\n", srv.Host)
+		fmt.Printf("用户: %s\n", srv.User)
+		fmt.Printf("密码: %s\n", pwd)
+		fmt.Printf("创建时间: %s\n", srv.CreatedAt.Format("2006-01-02 15:04:05"))
 	},
 }

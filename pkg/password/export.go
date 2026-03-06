@@ -30,6 +30,7 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 	}
 	
 	db.Content.Root.Groups = append(db.Content.Root.Groups, rootGroup)
+	db.Credentials = gokeepasslib.NewPasswordCredentials(kdbxPassword)
 	
 	file, err := os.Create(outputPath)
 	if err != nil {
@@ -38,7 +39,5 @@ func ExportToKeePass(servers []Server, masterKey, outputPath, kdbxPassword strin
 	defer file.Close()
 	
 	encoder := gokeepasslib.NewEncoder(file)
-	encoder.Encode(db)
-	
-	return nil
+	return encoder.Encode(db)
 }

@@ -161,7 +161,15 @@ func init() {
 	resetBatchCmd.MarkFlagRequired("key")
 	
 	passwdCmd.AddCommand(listCmd)
+	exportCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	exportCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	exportCmd.Flags().String("output", "passwords.kdbx", "输出文件")
+	exportCmd.Flags().String("kdbx-password", "", "KeePass数据库密码")
+	exportCmd.MarkFlagRequired("key")
+	exportCmd.MarkFlagRequired("kdbx-password")
+	
 	passwdCmd.AddCommand(resetBatchCmd)
+	passwdCmd.AddCommand(exportCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -341,5 +349,31 @@ var resetBatchCmd = &cobra.Command{
 			
 			fmt.Printf("  ✅ 改密成功\n\n")
 		}
+	},
+}
+
+var exportCmd = &cobra.Command{
+	Use:   "export",
+	Short: "导出到KeePassXC",
+	Run: func(cmd *cobra.Command, args []string) {
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		servers, _ := store.List()
+		
+		outputPath, _ := cmd.Flags().GetString("output")
+		kdbxPass, _ := cmd.Flags().GetString("kdbx-password")
+		
+		err = password.ExportToKeePass(servers, masterKey, outputPath, kdbxPass)
+		if err != nil {
+			fmt.Printf("❌ 导出失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ 已导出 %d 台服务器到 %s\n", len(servers), outputPath)
 	},
 }

@@ -371,7 +371,24 @@ var resetBatchCmd = &cobra.Command{
 			newPwd, _ := password.Generate(24)
 			
 			// 改密
-			err := password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+			var err error
+			if srv.ResetMethod == "virsh" {
+				fmt.Printf("  使用virsh方式改密...\n")
+				err = password.ResetPasswordVirsh(
+					srv.HypervisorHost,
+					srv.HypervisorPort,
+					srv.HypervisorUser,
+					srv.HypervisorPass,
+					srv.HypervisorKey,
+					srv.HypervisorKeyPass,
+					srv.InstanceID,
+					srv.User,
+					newPwd,
+				)
+			} else {
+				fmt.Printf("  使用SSH方式改密...\n")
+				err = password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+			}
 			if err != nil {
 				fmt.Printf("  ❌ 改密失败: %v\n\n", err)
 				continue

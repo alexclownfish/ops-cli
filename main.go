@@ -202,7 +202,7 @@ func init() {
 	importCmd.Flags().StringVar(&hypervisorKey, "hypervisor-key", "", "物理机密钥路径")
 	importCmd.Flags().StringVar(&hypervisorKeyPass, "hypervisor-key-pass", "", "物理机密钥密码")
 	importCmd.MarkFlagRequired("key")
-	importCmd.MarkFlagRequired("hypervisor-host")
+	// hypervisor-host不再必填，自动从OpenStack获取
 	
 	passwdCmd.AddCommand(resetCmd)
 	passwdCmd.AddCommand(importCmd)
@@ -509,6 +509,14 @@ var importCmd = &cobra.Command{
 		}
 		fmt.Println("✅ 认证成功")
 		
+		// 获取物理机映射
+		fmt.Println("正在获取物理机列表...")
+		if err := client.GetHypervisorMap(); err != nil {
+			fmt.Printf("❌ 获取物理机失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ 找到 %d 台物理机\n", len(client.HypervisorMap))
+		
 		// 获取虚拟机列表
 		fmt.Println("正在获取虚拟机列表...")
 		vms, err := client.ListVMs()
@@ -545,7 +553,7 @@ var importCmd = &cobra.Command{
 				UpdatedAt:         time.Now(),
 				ResetMethod:       "virsh",
 				InstanceID:        vm.InstanceID,
-				HypervisorHost:    hypervisorHost,
+				HypervisorHost:    vm.HypervisorHost,
 				HypervisorPort:    hypervisorPort,
 				HypervisorUser:    hypervisorUser,
 				HypervisorPass:    hypervisorPass,

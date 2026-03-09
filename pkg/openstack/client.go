@@ -16,6 +16,7 @@ type Client struct {
 	Project  string
 	Token    string
 	NovaURL  string
+	HypervisorMap map[string]string // hypervisor_hostname -> IP映射
 }
 
 type VM struct {
@@ -131,21 +132,54 @@ func (c *Client) ListVMs() ([]VM, error) {
 		}
 		
 		// 获取物理机
-		hypervisor := ""
+		hypervisorHostname := ""
 		if h, ok := server["OS-EXT-SRV-ATTR:hypervisor_hostname"]; ok {
-			hypervisor = h.(string)
+			hypervisorHostname = h.(string)
 		}
+		
+		// 转换为IP
+		hypervisorIP := c.HypervisorMap[hypervisorHostname]
 		
 		vm := VM{
 			ID:             server["name"].(string),
 			Name:           server["name"].(string),
 			IP:             ip,
 			InstanceID:     server["id"].(string),
-			HypervisorHost: hypervisor,
+			HypervisorHost: hypervisorIP,
 			User:           "root",
 		}
 		vms = append(vms, vm)
 	}
 
 	return vms, nil
+}
+
+func (c *Client) GetHypervisorMap() error {
+	req, _ := http.NewRequest("GET", c.NovaURL+"/os-hypervisors/detail", nil)
+	req.Header.Set("X-Auth-Token", c.Token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("获取物理机列表失败: %d", resp.StatusCode)
+	}
+
+	var result map[string]interface{}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	c.HypervisorMap = make(map[string]string)
+	hypervisors := result["hypervisors"].([]interface{})
+	
+	for _, h := range hypervisors {
+		hyp := h.(map[string]interface{})
+		hostname := hyp["hypervisor_hostname"].(string)
+		ip := hyp["host_ip"].(string)
+		c.HypervisorMap[hostname] = ip
+	}
+
+	return nil
 }

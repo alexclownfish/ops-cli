@@ -13,6 +13,14 @@ import (
 
 var (
 	configFile string
+	
+	// virsh相关参数
+	resetMethod      string
+	instanceID       string
+	hypervisorHost   string
+	hypervisorPort   int
+	hypervisorUser   string
+	hypervisorPass   string
 	keyPath    string
 	keyPass    string
 	host     string
@@ -142,6 +150,12 @@ func init() {
 	saveCmd.Flags().StringVarP(&user, "user", "u", "root", "用户名")
 	saveCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
 	saveCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	saveCmd.Flags().StringVar(&resetMethod, "method", "ssh", "改密方式: ssh|virsh")
+	saveCmd.Flags().StringVar(&instanceID, "instance-id", "", "虚拟机实例ID(virsh)")
+	saveCmd.Flags().StringVar(&hypervisorHost, "hypervisor-host", "", "物理机地址(virsh)")
+	saveCmd.Flags().IntVar(&hypervisorPort, "hypervisor-port", 22, "物理机SSH端口(virsh)")
+	saveCmd.Flags().StringVar(&hypervisorUser, "hypervisor-user", "root", "物理机用户(virsh)")
+	saveCmd.Flags().StringVar(&hypervisorPass, "hypervisor-pass", "", "物理机密码(virsh)")
 	saveCmd.MarkFlagRequired("host")
 	saveCmd.MarkFlagRequired("key")
 	
@@ -234,10 +248,19 @@ var saveCmd = &cobra.Command{
 		
 		// 保存密码
 		srv := password.Server{
-			ID:   serverID,
-			Name: serverID,
-			Host: host,
-			User: user,
+			ID:                serverID,
+			Name:              serverID,
+			Host:              host,
+			User:              user,
+			PasswordEncrypted: "",
+			CreatedAt:         time.Now(),
+			UpdatedAt:         time.Now(),
+			ResetMethod:       resetMethod,
+			InstanceID:        instanceID,
+			HypervisorHost:    hypervisorHost,
+			HypervisorPort:    hypervisorPort,
+			HypervisorUser:    hypervisorUser,
+			HypervisorPass:    hypervisorPass,
 		}
 		
 		if err := store.Save(srv, newPassword); err != nil {

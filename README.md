@@ -858,3 +858,158 @@ pipeline {
     }
 }
 ```
+
+### virsh改密详细步骤（OpenStack环境）
+
+#### 适用场景
+- OpenStack虚拟机密码忘记
+- 需要批量重置虚拟机密码
+- 无法通过SSH登录虚拟机
+
+#### 前置条件
+1. 有物理机（宿主机）的SSH访问权限
+2. 知道虚拟机的实例ID（instance ID）
+3. 物理机上已安装libvirt和virsh工具
+
+#### 步骤1：查找虚拟机所在的物理机
+
+**方法1：通过OpenStack API查询**
+```bash
+# 使用OpenStack CLI
+openstack server show <vm-uuid> -f json | jq -r '.["OS-EXT-SRV-ATTR:hypervisor_hostname"]'
+
+# 或使用nova命令
+nova show <vm-uuid> | grep hypervisor_hostname
+```
+
+**方法2：通过配置文件映射**
+```bash
+# 如果有物理机IP映射表
+# 例如：hypervisor-01 -> 172.28.188.89
+```
+
+#### 步骤2：获取虚拟机实例ID
+
+**在物理机上查询：**
+```bash
+# SSH登录物理机
+ssh root@172.28.188.89
+
+# 列出所有虚拟机
+virsh list --all
+
+# 输出示例：
+# Id    Name                           State
+# ----------------------------------------------------
+# 1     instance-00000001              running
+# 2     instance-00000002              running
+```
+
+**实例ID就是Name列的值**（例如：instance-00000001）
+
+#### 步骤3：使用ops-cli保存服务器信息
+
+**当前版本需要手动配置数据库：**
+
+1. 先保存基本信息：
+```bash
+ops passwd save vm-openstack-001 \
+  -H 192.168.1.100 \
+  -u root \
+  --key $OPS_MASTER_KEY
+```
+
+2. 手动编辑数据库添加virsh信息（使用BoltDB工具或直接修改代码）：
+```json
+{
+  "id": "vm-openstack-001",
+  "name": "vm-openstack-001",
+  "host": "192.168.1.100",
+  "user": "root",
+  "reset_method": "virsh",
+  "instance_id": "instance-00000001",
+  "hypervisor_host": "172.28.188.89",
+  "hypervisor_port": 22,
+  "hypervisor_user": "root",
+  "hypervisor_pass": "物理机密码"
+}
+```
+
+#### 步骤4：执行改密
+
+```bash
+# 单机改密
+ops passwd reset vm-openstack-001 --key $OPS_MASTER_KEY
+
+# 输出示例：
+# 生成新密码: xT9#mK2_pLqW8@nR5vYzA3Bc
+# 使用virsh方式改密...
+# ✅ 改密成功
+```
+
+#### 步骤5：验证新密码
+
+```bash
+# 使用新密码SSH登录虚拟机
+ssh root@192.168.1.100
+
+# 或查看保存的密码
+ops passwd show vm-openstack-001 --key $OPS_MASTER_KEY
+```
+
+#### 工作原理
+
+virsh改密的底层命令：
+```bash
+# 在物理机上执行
+virsh set-user-password <instance-id> <username> <new-password>
+
+# 例如：
+virsh set-user-password instance-00000001 root "xT9#mK2_pLqW8@nR5vYzA3Bc"
+```
+
+#### 注意事项
+
+1. **权限要求**：需要物理机root权限
+2. **虚拟机状态**：虚拟机必须处于running状态
+3. **QEMU Guest Agent**：虚拟机内需要安装qemu-guest-agent
+4. **密码复杂度**：某些系统可能有密码策略限制
+5. **安全性**：物理机密码需要妥善保管
+
+#### 故障排查
+
+**问题1：virsh命令找不到**
+```bash
+# 安装libvirt
+yum install libvirt libvirt-client  # CentOS/RHEL
+apt install libvirt-clients          # Ubuntu/Debian
+```
+
+**问题2：改密失败 - QEMU guest agent is not connected**
+```bash
+# 在虚拟机内安装qemu-guest-agent
+yum install qemu-guest-agent         # CentOS/RHEL
+apt install qemu-guest-agent         # Ubuntu/Debian
+
+# 启动服务
+systemctl start qemu-guest-agent
+systemctl enable qemu-guest-agent
+```
+
+**问题3：找不到虚拟机实例**
+```bash
+# 检查实例ID是否正确
+virsh list --all | grep instance
+
+# 检查是否在正确的物理机上
+nova show <vm-uuid> | grep hypervisor
+```
+
+#### 未来改进
+
+计划在下个版本中添加：
+- 自动查询物理机位置（通过OpenStack API）
+- 图形化配置virsh参数
+- 批量virsh改密支持
+- 改密前自动检查qemu-guest-agent状态
+

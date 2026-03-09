@@ -141,10 +141,10 @@ func (c *Client) ListVMs() ([]VM, error) {
 		hypervisorIP := c.HypervisorMap[hypervisorHostname]
 		
 		vm := VM{
-			ID:             server["name"].(string),
-			Name:           server["name"].(string),
+			ID:             fmt.Sprintf("%v", server["name"]),
+			Name:           fmt.Sprintf("%v", server["name"]),
 			IP:             ip,
-			InstanceID:     server["id"].(string),
+			InstanceID:     fmt.Sprintf("%v", server["id"]),
 			HypervisorHost: hypervisorIP,
 			User:           "root",
 		}

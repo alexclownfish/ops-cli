@@ -24,6 +24,7 @@ var (
 	hypervisorPass   string
 	hypervisorKey    string
 	hypervisorKeyPass string
+	vmUser           string
 	keyPath    string
 	keyPass    string
 	host     string
@@ -201,6 +202,7 @@ func init() {
 	importCmd.Flags().StringVar(&hypervisorPass, "hypervisor-pass", "", "物理机密码")
 	importCmd.Flags().StringVar(&hypervisorKey, "hypervisor-key", "", "物理机密钥路径")
 	importCmd.Flags().StringVar(&hypervisorKeyPass, "hypervisor-key-pass", "", "物理机密钥密码")
+	importCmd.Flags().StringVar(&vmUser, "vm-user", "", "物理机密钥密码")
 	importCmd.MarkFlagRequired("key")
 	// hypervisor-host不再必填，自动从OpenStack获取
 	
@@ -547,7 +549,7 @@ var importCmd = &cobra.Command{
 				ID:                vm.ID,
 				Name:              vm.Name,
 				Host:              vm.IP,
-				User:              vm.User,
+				User:              vmUser,
 				PasswordEncrypted: "",
 				CreatedAt:         time.Now(),
 				UpdatedAt:         time.Now(),

@@ -38,7 +38,7 @@ func ResetPasswordVirsh(hypervisorHost string, hypervisorPort int, hypervisorUse
 	}
 	defer client.Close()
 	
-	cmd := fmt.Sprintf("virsh set-user-password %s %s %s", instanceID, vmUser, newPassword)
+	cmd := fmt.Sprintf("sudo virsh set-user-password %s %s %s", instanceID, vmUser, newPassword)
 	_, err := client.Execute(cmd)
 	if err != nil {
 		return fmt.Errorf("virsh改密失败: %v", err)

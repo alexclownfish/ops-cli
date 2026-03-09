@@ -122,19 +122,23 @@ func (c *Client) ListVMs() ([]VM, error) {
 		
 		// 获取IP地址
 		ip := ""
-		addresses := server["addresses"].(map[string]interface{})
-		for _, addrs := range addresses {
-			addrList := addrs.([]interface{})
-			if len(addrList) > 0 {
-				ip = addrList[0].(map[string]interface{})["addr"].(string)
-				break
+		if addresses, ok := server["addresses"].(map[string]interface{}); ok {
+			for _, addrs := range addresses {
+				if addrList, ok := addrs.([]interface{}); ok && len(addrList) > 0 {
+					if addr, ok := addrList[0].(map[string]interface{}); ok {
+						if ipStr, ok := addr["addr"].(string); ok {
+							ip = ipStr
+							break
+						}
+					}
+				}
 			}
 		}
 		
 		// 获取物理机
 		hypervisorHostname := ""
-		if h, ok := server["OS-EXT-SRV-ATTR:hypervisor_hostname"]; ok {
-			hypervisorHostname = h.(string)
+		if h, ok := server["OS-EXT-SRV-ATTR:hypervisor_hostname"]; ok && h != nil {
+			hypervisorHostname = fmt.Sprintf("%v", h)
 		}
 		
 		// 转换为IP

@@ -113,3 +113,10 @@ func (s *Store) List() ([]Server, error) {
 func (s *Store) Close() error {
 	return s.db.Close()
 }
+
+func (s *Store) Delete(id string) error {
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte("servers"))
+		return b.Delete([]byte(id))
+	})
+}

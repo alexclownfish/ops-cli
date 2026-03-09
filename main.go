@@ -207,7 +207,12 @@ func init() {
 	// hypervisor-host不再必填，自动从OpenStack获取
 	
 	passwdCmd.AddCommand(resetCmd)
+	deleteCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	deleteCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	deleteCmd.MarkFlagRequired("key")
+	
 	passwdCmd.AddCommand(importCmd)
+	passwdCmd.AddCommand(deleteCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -573,5 +578,28 @@ var importCmd = &cobra.Command{
 		}
 		
 		fmt.Printf("\n导入完成！成功 %d/%d 台\n", successCount, len(vms))
+	},
+}
+
+var deleteCmd = &cobra.Command{
+	Use:   "delete [server-id]",
+	Short: "删除服务器",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		serverID := args[0]
+		
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		if err := store.Delete(serverID); err != nil {
+			fmt.Printf("❌ 删除失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ 已删除服务器: %s\n", serverID)
 	},
 }

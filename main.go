@@ -21,6 +21,8 @@ var (
 	hypervisorPort   int
 	hypervisorUser   string
 	hypervisorPass   string
+	hypervisorKey    string
+	hypervisorKeyPass string
 	keyPath    string
 	keyPass    string
 	host     string
@@ -156,6 +158,8 @@ func init() {
 	saveCmd.Flags().IntVar(&hypervisorPort, "hypervisor-port", 22, "物理机SSH端口(virsh)")
 	saveCmd.Flags().StringVar(&hypervisorUser, "hypervisor-user", "root", "物理机用户(virsh)")
 	saveCmd.Flags().StringVar(&hypervisorPass, "hypervisor-pass", "", "物理机密码(virsh)")
+	saveCmd.Flags().StringVar(&hypervisorKey, "hypervisor-key", "", "物理机密钥路径(virsh)")
+	saveCmd.Flags().StringVar(&hypervisorKeyPass, "hypervisor-key-pass", "", "物理机密码(virsh)")
 	saveCmd.MarkFlagRequired("host")
 	saveCmd.MarkFlagRequired("key")
 	
@@ -261,6 +265,8 @@ var saveCmd = &cobra.Command{
 			HypervisorPort:    hypervisorPort,
 			HypervisorUser:    hypervisorUser,
 			HypervisorPass:    hypervisorPass,
+			HypervisorKey:     hypervisorKey,
+			HypervisorKeyPass: hypervisorKeyPass,
 		}
 		
 		if err := store.Save(srv, newPassword); err != nil {
@@ -436,6 +442,8 @@ var resetCmd = &cobra.Command{
 				srv.HypervisorPort,
 				srv.HypervisorUser,
 				srv.HypervisorPass,
+				srv.HypervisorKey,
+				srv.HypervisorKeyPass,
 				srv.InstanceID,
 				srv.User,
 				newPwd,

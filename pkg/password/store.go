@@ -20,7 +20,9 @@ type Server struct {
 	HypervisorHost   string `json:"hypervisor_host,omitempty"`
 	HypervisorPort   int    `json:"hypervisor_port,omitempty"`
 	HypervisorUser   string `json:"hypervisor_user,omitempty"`
-	HypervisorPass   string `json:"hypervisor_pass,omitempty"`
+	HypervisorPass    string `json:"hypervisor_pass,omitempty"`
+	HypervisorKey     string `json:"hypervisor_key,omitempty"`
+	HypervisorKeyPass string `json:"hypervisor_key_pass,omitempty"`
 	ResetMethod      string `json:"reset_method,omitempty"` // ssh | virsh
 }
 

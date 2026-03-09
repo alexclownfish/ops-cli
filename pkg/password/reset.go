@@ -30,8 +30,8 @@ func VerifyPassword(host string, port int, user, password string) error {
 	return nil
 }
 
-func ResetPasswordVirsh(hypervisorHost string, hypervisorPort int, hypervisorUser, hypervisorPassword string, instanceID, vmUser, newPassword string) error {
-	client := ssh.NewClient(hypervisorHost, hypervisorPort, hypervisorUser, hypervisorPassword, "", "")
+func ResetPasswordVirsh(hypervisorHost string, hypervisorPort int, hypervisorUser, hypervisorPassword, hypervisorKey, hypervisorKeyPass string, instanceID, vmUser, newPassword string) error {
+	client := ssh.NewClient(hypervisorHost, hypervisorPort, hypervisorUser, hypervisorPassword, hypervisorKey, hypervisorKeyPass)
 	
 	if err := client.Connect(); err != nil {
 		return fmt.Errorf("连接物理机失败: %v", err)

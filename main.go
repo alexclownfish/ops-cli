@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"ops-cli/pkg/openstack"
 	"github.com/spf13/cobra"
 	"ops-cli/pkg/ssh"
 	"ops-cli/pkg/config"
@@ -192,7 +193,19 @@ func init() {
 	resetCmd.MarkFlagRequired("key")
 	
 	passwdCmd.AddCommand(exportCmd)
+	importCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	importCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	importCmd.Flags().StringVar(&hypervisorHost, "hypervisor-host", "", "物理机地址")
+	importCmd.Flags().IntVar(&hypervisorPort, "hypervisor-port", 22, "物理机SSH端口")
+	importCmd.Flags().StringVar(&hypervisorUser, "hypervisor-user", "root", "物理机用户")
+	importCmd.Flags().StringVar(&hypervisorPass, "hypervisor-pass", "", "物理机密码")
+	importCmd.Flags().StringVar(&hypervisorKey, "hypervisor-key", "", "物理机密钥路径")
+	importCmd.Flags().StringVar(&hypervisorKeyPass, "hypervisor-key-pass", "", "物理机密钥密码")
+	importCmd.MarkFlagRequired("key")
+	importCmd.MarkFlagRequired("hypervisor-host")
+	
 	passwdCmd.AddCommand(resetCmd)
+	passwdCmd.AddCommand(importCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -479,5 +492,76 @@ var resetCmd = &cobra.Command{
 		store.Save(*srv, newPwd)
 		
 		fmt.Printf("✅ 改密成功\n")
+	},
+}
+
+var importCmd = &cobra.Command{
+	Use:   "import",
+	Short: "从OpenStack导入虚拟机",
+	Run: func(cmd *cobra.Command, args []string) {
+		// 创建OpenStack客户端
+		client := openstack.NewClient()
+		
+		fmt.Println("正在连接OpenStack...")
+		if err := client.Authenticate(); err != nil {
+			fmt.Printf("❌ 认证失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("✅ 认证成功")
+		
+		// 获取虚拟机列表
+		fmt.Println("正在获取虚拟机列表...")
+		vms, err := client.ListVMs()
+		if err != nil {
+			fmt.Printf("❌ 获取失败: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("✅ 找到 %d 台虚拟机\n\n", len(vms))
+		
+		// 打开数据库
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		// 批量导入
+		successCount := 0
+		for _, vm := range vms {
+			fmt.Printf("导入: %s (%s)\n", vm.Name, vm.IP)
+			
+			// 生成密码
+			newPassword, _ := password.Generate(24)
+			
+			// 创建服务器记录
+			srv := password.Server{
+				ID:                vm.ID,
+				Name:              vm.Name,
+				Host:              vm.IP,
+				User:              vm.User,
+				PasswordEncrypted: "",
+				CreatedAt:         time.Now(),
+				UpdatedAt:         time.Now(),
+				ResetMethod:       "virsh",
+				InstanceID:        vm.InstanceID,
+				HypervisorHost:    hypervisorHost,
+				HypervisorPort:    hypervisorPort,
+				HypervisorUser:    hypervisorUser,
+				HypervisorPass:    hypervisorPass,
+				HypervisorKey:     hypervisorKey,
+				HypervisorKeyPass: hypervisorKeyPass,
+			}
+			
+			if err := store.Save(srv, newPassword); err != nil {
+				fmt.Printf("  ❌ 保存失败: %v\n", err)
+				continue
+			}
+			
+			fmt.Printf("  ✅ 已导入\n")
+			successCount++
+		}
+		
+		fmt.Printf("\n导入完成！成功 %d/%d 台\n", successCount, len(vms))
 	},
 }

@@ -1013,3 +1013,53 @@ nova show <vm-uuid> | grep hypervisor
 - 批量virsh改密支持
 - 改密前自动检查qemu-guest-agent状态
 
+
+### OpenStack批量导入（新功能）
+
+**从OpenStack自动导入所有虚拟机：**
+
+```bash
+# 步骤1：设置OpenStack环境变量
+export OS_AUTH_URL=http://keystone-admin.cty.os:10006/v3
+export OS_USERNAME=admin
+export OS_PASSWORD=your-password
+export OS_PROJECT_NAME=admin
+export OPS_MASTER_KEY="your-master-key"
+
+# 步骤2：一键导入所有虚拟机
+ops passwd import \
+  --hypervisor-port 10000 \
+  --hypervisor-user secure \
+  --hypervisor-key /root/.ssh/id_rsa \
+  --vm-user secure \
+  --key $OPS_MASTER_KEY
+
+# 输出示例：
+# 正在连接OpenStack...
+# ✅ 认证成功
+# 正在获取物理机列表...
+# ✅ 找到 3 台物理机
+# 正在获取虚拟机列表...
+# ✅ 找到 10 台虚拟机
+#
+# 导入: vm-001 (192.168.1.100)
+#   ✅ 已导入
+# 导入: vm-002 (192.168.1.101)
+#   ✅ 已导入
+# ...
+# 导入完成！成功 10/10 台
+```
+
+**自动完成：**
+- ✅ 从OpenStack API获取所有虚拟机信息
+- ✅ 自动获取虚拟机IP地址
+- ✅ 自动获取虚拟机实例ID
+- ✅ 自动获取物理机IP（无需手动指定）
+- ✅ 自动生成密码并保存到数据库
+
+**优势：**
+- 不再需要手动复制粘贴虚拟机信息
+- 不再需要查询物理机IP
+- 一条命令导入所有虚拟机
+- 支持大规模虚拟机批量管理
+

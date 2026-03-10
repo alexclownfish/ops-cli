@@ -169,7 +169,7 @@ ops passwd auto-rotate --key $OPS_MASTER_KEY --days 85
 
 **配置定时任务（完全自动化）：**
 ```bash
-# 1. 复制脚本
+# 1. 复制脚本（项目根目录下）
 cp password-rotate.sh /usr/local/bin/
 chmod +x /usr/local/bin/password-rotate.sh
 

@@ -220,7 +220,19 @@ func init() {
 	resetKeyCmd.MarkFlagRequired("new-key")
 	
 	passwdCmd.AddCommand(deleteCmd)
+	checkAgeCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	checkAgeCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	checkAgeCmd.Flags().Int("days", 85, "密码有效期（天）")
+	checkAgeCmd.MarkFlagRequired("key")
+	
+	autoRotateCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	autoRotateCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	autoRotateCmd.Flags().Int("days", 85, "密码有效期（天）")
+	autoRotateCmd.MarkFlagRequired("key")
+	
 	passwdCmd.AddCommand(resetKeyCmd)
+	passwdCmd.AddCommand(checkAgeCmd)
+	passwdCmd.AddCommand(autoRotateCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -722,5 +734,140 @@ var resetKeyCmd = &cobra.Command{
 		
 		fmt.Printf("\n✅ 主密钥更换完成！\n")
 		fmt.Printf("⚠️  请妥善保管新密钥，旧密钥已失效\n")
+	},
+}
+
+var checkAgeCmd = &cobra.Command{
+	Use:   "check-age",
+	Short: "检查密码年龄",
+	Run: func(cmd *cobra.Command, args []string) {
+		days, _ := cmd.Flags().GetInt("days")
+		
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		servers, err := store.List()
+		if err != nil {
+			fmt.Printf("❌ 获取服务器列表失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		var needRotate []password.Server
+		now := time.Now()
+		
+		for _, srv := range servers {
+			age := int(now.Sub(srv.UpdatedAt).Hours() / 24)
+			if age >= days {
+				needRotate = append(needRotate, srv)
+			}
+		}
+		
+		if len(needRotate) == 0 {
+			fmt.Printf("✅ 所有服务器密码都在有效期内\n")
+			return
+		}
+		
+		fmt.Printf("需要改密的服务器（%d台）:\n", len(needRotate))
+		for _, srv := range needRotate {
+			age := int(now.Sub(srv.UpdatedAt).Hours() / 24)
+			fmt.Printf("- %s (已使用%d天)\n", srv.ID, age)
+		}
+	},
+}
+
+var autoRotateCmd = &cobra.Command{
+	Use:   "auto-rotate",
+	Short: "自动改密（密码到期）",
+	Run: func(cmd *cobra.Command, args []string) {
+		days, _ := cmd.Flags().GetInt("days")
+		
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		servers, err := store.List()
+		if err != nil {
+			fmt.Printf("❌ 获取服务器列表失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		var needRotate []password.Server
+		now := time.Now()
+		
+		for _, srv := range servers {
+			age := int(now.Sub(srv.UpdatedAt).Hours() / 24)
+			if age >= days {
+				needRotate = append(needRotate, srv)
+			}
+		}
+		
+		if len(needRotate) == 0 {
+			fmt.Printf("✅ 所有服务器密码都在有效期内\n")
+			return
+		}
+		
+		fmt.Printf("发现 %d 台服务器需要改密\n\n", len(needRotate))
+		
+		successCount := 0
+		for _, srv := range needRotate {
+			fmt.Printf("改密: %s\n", srv.ID)
+			
+			_, oldPwd, err := store.Get(srv.ID)
+			if err != nil {
+				fmt.Printf("  ❌ 获取密码失败: %v\n\n", err)
+				continue
+			}
+			
+			newPwd, _ := password.Generate(24)
+			
+			// 智能改密
+			var resetErr error
+			
+			// 优先SSH
+			if oldPwd != "" {
+				fmt.Printf("  尝试SSH方式改密...\n")
+				resetErr = password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+				if resetErr == nil {
+					fmt.Printf("  ✅ SSH改密成功\n\n")
+					srv.ResetMethod = "ssh"
+					srv.UpdatedAt = time.Now()
+					store.Save(srv, newPwd)
+					successCount++
+					continue
+				}
+				fmt.Printf("  ⚠️  SSH改密失败: %v\n", resetErr)
+			}
+			
+			// 回退virsh
+			if srv.HypervisorHost != "" {
+				fmt.Printf("  尝试virsh方式改密...\n")
+				resetErr = password.ResetPasswordVirsh(
+					srv.HypervisorHost, srv.HypervisorPort,
+					srv.HypervisorUser, srv.HypervisorPass,
+					srv.HypervisorKey, srv.HypervisorKeyPass,
+					srv.InstanceID, srv.User, newPwd,
+				)
+				if resetErr == nil {
+					fmt.Printf("  ✅ virsh改密成功\n\n")
+					srv.ResetMethod = "virsh"
+					srv.UpdatedAt = time.Now()
+					store.Save(srv, newPwd)
+					successCount++
+					continue
+				}
+				fmt.Printf("  ⚠️  virsh改密失败: %v\n", resetErr)
+			}
+			
+			fmt.Printf("  ❌ 改密失败\n\n")
+		}
+		
+		fmt.Printf("✅ 改密完成: 成功 %d/%d 台\n", successCount, len(needRotate))
 	},
 }

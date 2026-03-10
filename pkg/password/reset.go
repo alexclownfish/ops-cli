@@ -13,7 +13,7 @@ func ResetPassword(host string, port int, user, oldPassword, newPassword string)
 	}
 	defer client.Close()
 	
-	cmd := fmt.Sprintf("echo '%s:%s' | chpasswd", user, newPassword)
+	cmd := fmt.Sprintf("echo '%s:%s' | sudo chpasswd", user, newPassword)
 	_, err := client.Execute(cmd)
 	if err != nil {
 		return fmt.Errorf("改密失败: %v", err)

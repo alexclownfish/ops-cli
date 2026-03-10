@@ -214,6 +214,10 @@ func init() {
 	
 	passwdCmd.AddCommand(importCmd)
 	resetKeyCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	resetKeyCmd.Flags().String("old-key", "", "旧主密钥")
+	resetKeyCmd.Flags().String("new-key", "", "新主密钥")
+	resetKeyCmd.MarkFlagRequired("old-key")
+	resetKeyCmd.MarkFlagRequired("new-key")
 	
 	passwdCmd.AddCommand(deleteCmd)
 	passwdCmd.AddCommand(resetKeyCmd)
@@ -633,24 +637,90 @@ var deleteCmd = &cobra.Command{
 
 var resetKeyCmd = &cobra.Command{
 	Use:   "reset-key",
-	Short: "重置主密钥哈希（危险操作）",
+	Short: "更换主密钥（需要旧密钥验证）",
 	Run: func(cmd *cobra.Command, args []string) {
+		oldKey, _ := cmd.Flags().GetString("old-key")
+		newKey, _ := cmd.Flags().GetString("new-key")
+		
+		if oldKey == "" || newKey == "" {
+			fmt.Printf("❌ 必须提供 --old-key 和 --new-key\n")
+			os.Exit(1)
+		}
+		
+		// 1. 验证旧key
+		oldStore, err := password.NewStore(dbPath, oldKey)
+		if err != nil {
+			fmt.Printf("❌ 旧密钥验证失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ 旧密钥验证成功\n")
+		
+		// 2. 获取所有服务器
+		servers, err := oldStore.List()
+		if err != nil {
+			fmt.Printf("❌ 获取服务器列表失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("正在重新加密 %d 台服务器的密码...\n", len(servers))
+		
+		// 3. 解密所有密码
+		type ServerWithPassword struct {
+			Server   password.Server
+			Password string
+		}
+		var serversWithPasswords []ServerWithPassword
+		
+		for _, srv := range servers {
+			_, pwd, err := oldStore.Get(srv.ID)
+			if err != nil {
+				fmt.Printf("⚠️  跳过 %s: %v\n", srv.ID, err)
+				continue
+			}
+			serversWithPasswords = append(serversWithPasswords, ServerWithPassword{
+				Server:   srv,
+				Password: pwd,
+			})
+		}
+		
+		oldStore.Close()
+		
+		// 4. 删除key哈希
 		db, err := bbolt.Open(dbPath, 0600, nil)
 		if err != nil {
 			fmt.Printf("❌ 打开数据库失败: %v\n", err)
 			os.Exit(1)
 		}
-		defer db.Close()
 		
 		err = db.Update(func(tx *bbolt.Tx) error {
 			return tx.DeleteBucket([]byte("key_hash"))
 		})
+		db.Close()
 		
 		if err != nil {
-			fmt.Printf("❌ 重置失败: %v\n", err)
+			fmt.Printf("❌ 删除旧哈希失败: %v\n", err)
 			os.Exit(1)
 		}
 		
-		fmt.Printf("✅ 主密钥哈希已重置，下次使用时将存储新的哈希\n")
+		// 5. 用新key重新加密
+		newStore, err := password.NewStore(dbPath, newKey)
+		if err != nil {
+			fmt.Printf("❌ 创建新密钥失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer newStore.Close()
+		
+		for _, item := range serversWithPasswords {
+			err := newStore.Save(item.Server, item.Password)
+			if err != nil {
+				fmt.Printf("⚠️  保存 %s 失败: %v\n", item.Server.ID, err)
+			} else {
+				fmt.Printf("  ✅ %s\n", item.Server.ID)
+			}
+		}
+		
+		fmt.Printf("\n✅ 主密钥更换完成！\n")
+		fmt.Printf("⚠️  请妥善保管新密钥，旧密钥已失效\n")
 	},
 }

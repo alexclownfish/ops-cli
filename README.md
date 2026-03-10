@@ -98,7 +98,17 @@ ops passwd show vm-001 --key $MASTER_KEY
 ops passwd list --key $MASTER_KEY
 ```
 
-**5. 修改密码（单机）：**
+**5. 删除服务器：**
+```bash
+ops passwd delete vm-001 --key $MASTER_KEY
+```
+
+**6. 修改密码（单机）：**
+```bash
+ops passwd list --key $MASTER_KEY
+```
+
+
 ```bash
 # SSH方式改密
 ops passwd reset vm-001 --key $MASTER_KEY
@@ -107,13 +117,13 @@ ops passwd reset vm-001 --key $MASTER_KEY
 # 需要在保存时指定reset_method=virsh和物理机信息
 ```
 
-**6. 批量改密：**
+**7. 批量改密：**
 ```bash
 ops passwd reset-batch --key $MASTER_KEY
 # 自动遍历所有服务器并改密
 ```
 
-**7. 导出到KeePassXC：**
+**8. 导出到KeePassXC：**
 ```bash
 ops passwd export --key $MASTER_KEY --kdbx-password "keepass-password" --output passwords.kdbx
 # 然后在KeePassXC中打开passwords.kdbx
@@ -167,8 +177,10 @@ generate                生成强密码
 save                    保存密码
 show                    查看密码
 list                    列出所有服务器
+delete                  删除服务器
 reset                   修改密码（单机）
 reset-batch             批量改密
+import                  从OpenStack导入虚拟机
 export                  导出到KeePassXC
 
 通用参数：

@@ -377,6 +377,12 @@ var listCmd = &cobra.Command{
 			fmt.Printf("  名称: %s\n", srv.Name)
 			fmt.Printf("  地址: %s\n", srv.Host)
 			fmt.Printf("  用户: %s\n", srv.User)
+			if srv.InstanceID != "" {
+				fmt.Printf("  虚拟机ID: %s\n", srv.InstanceID)
+			}
+			if srv.HypervisorHost != "" {
+				fmt.Printf("  物理机IP: %s\n", srv.HypervisorHost)
+			}
 			fmt.Printf("  更新: %s\n\n", srv.UpdatedAt.Format("2006-01-02 15:04:05"))
 		}
 	},

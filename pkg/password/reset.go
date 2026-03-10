@@ -14,13 +14,18 @@ func ResetPassword(host string, port int, user, oldPassword, newPassword string)
 	defer client.Close()
 	
 	cmd := fmt.Sprintf("printf '%%s\\n' \"%s:%s\" | sudo chpasswd", user, newPassword)
-	_, err := client.Execute(cmd)
+	fmt.Printf("  [DEBUG] 执行命令: %s\n", cmd)
+	
+	output, err := client.Execute(cmd)
+	fmt.Printf("  [DEBUG] 命令输出: %s\n", output)
+	
 	if err != nil {
-		return fmt.Errorf("改密失败: %v", err)
+		return fmt.Errorf("改密失败: %v (output: %s)", err, output)
 	}
 	
 	return nil
 }
+
 func VerifyPassword(host string, port int, user, password string) error {
 	client := ssh.NewClient(host, port, user, password, "", "")
 	if err := client.Connect(); err != nil {

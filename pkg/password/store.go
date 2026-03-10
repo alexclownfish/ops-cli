@@ -1,7 +1,10 @@
 package password
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 	"go.etcd.io/bbolt"
 )
@@ -47,7 +50,15 @@ func NewStore(dbPath, masterKey string) (*Store, error) {
 		return nil, err
 	}
 	
-	return &Store{db: db, masterKey: masterKey}, nil
+	store := &Store{db: db, masterKey: masterKey}
+	
+	// 验证主密钥
+	if err := store.InitOrVerifyKey(); err != nil {
+		db.Close()
+		return nil, err
+	}
+	
+	return store, nil
 }
 func (s *Store) Save(srv Server, plainPassword string) error {
 	encrypted, err := Encrypt(plainPassword, s.masterKey)
@@ -118,5 +129,31 @@ func (s *Store) Delete(id string) error {
 	return s.db.Update(func(tx *bbolt.Tx) error {
 		b := tx.Bucket([]byte("servers"))
 		return b.Delete([]byte(id))
+	})
+}
+
+// 初始化或验证主密钥
+func (s *Store) InitOrVerifyKey() error {
+	keyHash := sha256.Sum256([]byte(s.masterKey))
+	keyHashStr := hex.EncodeToString(keyHash[:])
+	
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("key_hash"))
+		if err != nil {
+			return err
+		}
+		
+		stored := b.Get([]byte("hash"))
+		if stored == nil {
+			// 首次使用，存储哈希
+			return b.Put([]byte("hash"), []byte(keyHashStr))
+		}
+		
+		// 验证哈希
+		if string(stored) != keyHashStr {
+			return fmt.Errorf("主密钥错误")
+		}
+		
+		return nil
 	})
 }

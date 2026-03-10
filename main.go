@@ -345,6 +345,12 @@ var showCmd = &cobra.Command{
 		fmt.Printf("地址: %s\n", srv.Host)
 		fmt.Printf("用户: %s\n", srv.User)
 		fmt.Printf("密码: %s\n", pwd)
+		if srv.InstanceID != "" {
+			fmt.Printf("虚拟机ID: %s\n", srv.InstanceID)
+		}
+		if srv.HypervisorHost != "" {
+			fmt.Printf("物理机IP: %s\n", srv.HypervisorHost)
+		}
 		fmt.Printf("创建时间: %s\n", srv.CreatedAt.Format("2006-01-02 15:04:05"))
 	},
 }

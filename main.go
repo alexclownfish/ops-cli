@@ -390,24 +390,36 @@ var resetBatchCmd = &cobra.Command{
 			// 生成新密码
 			newPwd, _ := password.Generate(24)
 			
-			// 改密
-			var err error
-			if srv.ResetMethod == "virsh" {
-				fmt.Printf("  使用virsh方式改密...\n")
-				err = password.ResetPasswordVirsh(
-					srv.HypervisorHost,
-					srv.HypervisorPort,
-					srv.HypervisorUser,
-					srv.HypervisorPass,
-					srv.HypervisorKey,
-					srv.HypervisorKeyPass,
-					srv.InstanceID,
-					srv.User,
-					newPwd,
+			// 智能改密
+			var resetErr error
+			
+			// 优先SSH
+			if oldPwd != "" {
+				resetErr = password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+				if resetErr == nil {
+					fmt.Printf("  ✅ SSH改密成功\n\n")
+					srv.ResetMethod = "ssh"
+					srv.UpdatedAt = time.Now()
+					store.Save(srv, newPwd)
+					continue
+				}
+			}
+			
+			// 回退virsh
+			if srv.HypervisorHost != "" {
+				resetErr = password.ResetPasswordVirsh(
+					srv.HypervisorHost, srv.HypervisorPort,
+					srv.HypervisorUser, srv.HypervisorPass,
+					srv.HypervisorKey, srv.HypervisorKeyPass,
+					srv.InstanceID, srv.User, newPwd,
 				)
-			} else {
-				fmt.Printf("  使用SSH方式改密...\n")
-				err = password.ResetPassword(srv.Host, 22, srv.User, oldPwd, newPwd)
+				if resetErr == nil {
+					fmt.Printf("  ✅ virsh改密成功\n\n")
+					srv.ResetMethod = "virsh"
+					srv.UpdatedAt = time.Now()
+					store.Save(srv, newPwd)
+					continue
+				}
 			}
 			if err != nil {
 				fmt.Printf("  ❌ 改密失败: %v\n\n", err)

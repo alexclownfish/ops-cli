@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"go.etcd.io/bbolt"
 	"ops-cli/pkg/openstack"
 	"github.com/spf13/cobra"
 	"ops-cli/pkg/ssh"
@@ -212,7 +213,10 @@ func init() {
 	deleteCmd.MarkFlagRequired("key")
 	
 	passwdCmd.AddCommand(importCmd)
+	resetKeyCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
+	
 	passwdCmd.AddCommand(deleteCmd)
+	passwdCmd.AddCommand(resetKeyCmd)
 	rootCmd.AddCommand(passwdCmd)
 }
 
@@ -624,5 +628,29 @@ var deleteCmd = &cobra.Command{
 		}
 		
 		fmt.Printf("✅ 已删除服务器: %s\n", serverID)
+	},
+}
+
+var resetKeyCmd = &cobra.Command{
+	Use:   "reset-key",
+	Short: "重置主密钥哈希（危险操作）",
+	Run: func(cmd *cobra.Command, args []string) {
+		db, err := bbolt.Open(dbPath, 0600, nil)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer db.Close()
+		
+		err = db.Update(func(tx *bbolt.Tx) error {
+			return tx.DeleteBucket([]byte("key_hash"))
+		})
+		
+		if err != nil {
+			fmt.Printf("❌ 重置失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ 主密钥哈希已重置，下次使用时将存储新的哈希\n")
 	},
 }

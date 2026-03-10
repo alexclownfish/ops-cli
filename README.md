@@ -22,8 +22,18 @@
 - **密码查看** - 查看已保存的密码
 - **KeePassXC导出** - 导出为KDBX格式，可直接导入KeePassXC
 
+### ✅ 密码生命周期管理
+- **密码年龄检查** - 检查密码使用天数
+- **自动改密** - 密码到期自动轮换
+- **智能改密** - SSH优先，virsh回退
+- **定时任务** - 配合cron实现自动化
+
+### ✅ 安全特性
+- **主密钥验证** - 防止未授权访问
+- **密钥更换** - 安全更换主密钥
+- **OpenStack集成** - 自动导入虚拟机
+
 ### 🚧 规划中
-- 密码生命周期管理（90天自动轮换）
 - 服务器监控告警
 - 日志分析
 - 自动化部署
@@ -1074,4 +1084,136 @@ ops passwd import \
 - 不再需要查询物理机IP
 - 一条命令导入所有虚拟机
 - 支持大规模虚拟机批量管理
+
+
+
+## 🔄 密码生命周期管理
+
+### 检查密码年龄
+
+```bash
+ops passwd check-age --key $MASTER_KEY --days 85
+```
+
+**输出示例：**
+```
+需要改密的服务器（2台）:
+- yangwenzhe-test1 (已使用86天)
+- yangwenzhe-test3 (已使用90天)
+```
+
+### 自动改密
+
+```bash
+ops passwd auto-rotate --key $MASTER_KEY --days 85
+```
+
+**输出示例：**
+```
+发现 2 台服务器需要改密
+
+改密: yangwenzhe-test1
+  尝试SSH方式改密...
+  ✅ SSH改密成功
+
+改密: yangwenzhe-test3
+  尝试SSH方式改密...
+  ⚠️  SSH改密失败: ...
+  尝试virsh方式改密...
+  ✅ virsh改密成功
+
+✅ 改密完成: 成功 2/2 台
+```
+
+### 配置定时任务（完全自动化）
+
+**步骤1：复制脚本**
+```bash
+cp password-rotate.sh /usr/local/bin/
+chmod +x /usr/local/bin/password-rotate.sh
+```
+
+**步骤2：设置环境变量**
+```bash
+# 在 /etc/environment 或 ~/.bashrc 中添加
+export OPS_MASTER_KEY="your-master-key-here"
+```
+
+**步骤3：配置cron**
+```bash
+# 每天凌晨2点执行
+echo "0 2 * * * root /usr/local/bin/password-rotate.sh >> /var/log/ops-rotate.log 2>&1" > /etc/cron.d/ops-password-rotate
+```
+
+**自动化流程：**
+1. ✅ 每天自动检查密码年龄
+2. ✅ 自动改密到期的服务器（SSH优先，virsh回退）
+3. ✅ 自动导出KDBX备份到 `/backup/passwords/`
+4. ✅ 自动清理30天前的备份
+
+---
+
+## 🔐 主密钥管理
+
+### 更换主密钥
+
+**安全更换主密钥（需要旧密钥验证）：**
+
+```bash
+ops passwd reset-key \
+  --old-key $OLD_MASTER_KEY \
+  --new-key $NEW_MASTER_KEY \
+  --db passwords.db
+```
+
+**输出示例：**
+```
+✅ 旧密钥验证成功
+正在重新加密 6 台服务器的密码...
+  ✅ yangwenzhe-test1
+  ✅ yangwenzhe-test2
+  ✅ yangwenzhe-test3
+  ✅ yangwenzhe-test4
+  ✅ yangwenzhe-test5
+  ✅ yangwenzhe-test6
+
+✅ 主密钥更换完成！
+⚠️  请妥善保管新密钥，旧密钥已失效
+```
+
+**安全特性：**
+- ✅ 必须提供旧密钥才能更换
+- ✅ 自动重新加密所有密码
+- ✅ 防止未授权更换密钥
+
+---
+
+## 🎯 智能改密方案
+
+**自动选择最佳改密方式：**
+
+1. **优先SSH改密**
+   - 速度快
+   - 不依赖物理机
+   - 适合日常使用
+
+2. **自动回退virsh**
+   - SSH失败时自动尝试
+   - 适合应急场景
+   - 无需原密码
+
+3. **自动记录方式**
+   - 记录成功的改密方式
+   - 优化下次执行
+
+**使用示例：**
+```bash
+# 单机改密（自动选择方式）
+ops passwd reset yangwenzhe-test1 --key $MASTER_KEY
+
+# 输出：
+# 生成新密码: xxx
+# 尝试SSH方式改密...
+# ✅ SSH改密成功
+```
 

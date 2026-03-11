@@ -888,14 +888,6 @@ openstack server list
 
 ---
 
-## 📚 更多信息
-
-- **GitHub仓库**: https://github.com/alexclownfish/ops-cli
-- **问题反馈**: https://github.com/alexclownfish/ops-cli/issues
-- **功能建议**: https://github.com/alexclownfish/ops-cli/issues/new
-
----
-
 ### openstack环境实测
 
 计划任务

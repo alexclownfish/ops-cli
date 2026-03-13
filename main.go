@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"os"
 	"sync"
 	"time"
@@ -11,6 +12,12 @@ import (
 	"ops-cli/pkg/ssh"
 	"ops-cli/pkg/config"
 	"ops-cli/pkg/password"
+)
+
+const (
+	version   = "1.0.0"
+	buildDate = "2026-03-13"
+	gitCommit = "latest"
 )
 
 var (
@@ -45,6 +52,7 @@ var rootCmd = &cobra.Command{
 	Use:   "ops",
 	Short: "运维工具集",
 	Long:  `ops-cli: 集成SSH批量执行、监控、部署等功能的运维工具`,
+	Version: fmt.Sprintf("%s\nBuild: %s\nCommit: %s\nGo: %s\nOS/Arch: %s/%s", version, buildDate, gitCommit, runtime.Version(), runtime.GOOS, runtime.GOARCH),
 }
 var execCmd = &cobra.Command{
 	Use:   "exec [command]",

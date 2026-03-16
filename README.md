@@ -1,4 +1,4 @@
-
+﻿
 
 # ops-cli
 
@@ -562,7 +562,8 @@ ops passwd generate                                    # 生成强密码
 ops passwd save <id> -H <host> -u <user> --key <key>  # 保存密码
 ops passwd show <id> --key <key>                       # 查看密码
 ops passwd list --key <key>                            # 列出所有服务器
-ops passwd delete <id> --key <key>                     # 删除服务器
+
+ops passwd update <id> [options] --key <key>              # 更新服务器信息
 ops passwd reset <id> --key <key>                      # 修改密码（单机）
 ops passwd reset-batch --key <key>                     # 批量改密
 ops passwd import --key <key> [options]                # 从OpenStack导入

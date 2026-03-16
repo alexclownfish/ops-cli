@@ -219,6 +219,15 @@ func init() {
 	deleteCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
 	deleteCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
 	deleteCmd.MarkFlagRequired("key")
+	updateCmd.Flags().String("name", "", "服务器名称")
+	updateCmd.Flags().String("host", "", "服务器地址")
+	updateCmd.Flags().String("user", "", "用户名")
+	updateCmd.Flags().String("password", "", "密码（留空自动生成）")
+	updateCmd.Flags().String("instance-id", "", "虚拟机ID")
+	updateCmd.Flags().String("hypervisor-host", "", "物理机IP")
+	updateCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
+	updateCmd.MarkFlagRequired("key")
+
 	
 	passwdCmd.AddCommand(importCmd)
 	resetKeyCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
@@ -228,6 +237,7 @@ func init() {
 	resetKeyCmd.MarkFlagRequired("new-key")
 	
 	passwdCmd.AddCommand(deleteCmd)
+	passwdCmd.AddCommand(updateCmd)
 	checkAgeCmd.Flags().StringVar(&dbPath, "db", "passwords.db", "数据库路径")
 	checkAgeCmd.Flags().StringVar(&masterKey, "key", "", "主密钥")
 	checkAgeCmd.Flags().Int("days", 85, "密码有效期（天）")
@@ -641,6 +651,75 @@ var importCmd = &cobra.Command{
 		}
 		
 		fmt.Printf("\n导入完成！成功 %d/%d 台\n", successCount, len(vms))
+	},
+}
+
+var updateCmd = &cobra.Command{
+	Use:   "update [server-id]",
+	Short: "更新服务器信息",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		serverID := args[0]
+		
+		store, err := password.NewStore(dbPath, masterKey)
+		if err != nil {
+			fmt.Printf("❌ 打开数据库失败: %v\n", err)
+			os.Exit(1)
+		}
+		defer store.Close()
+		
+		_, _, err = store.Get(serverID)
+		if err != nil {
+			fmt.Printf("❌ 服务器不存在: %s\n", serverID)
+			os.Exit(1)
+		}
+		
+		updates := make(map[string]interface{})
+		
+		if cmd.Flags().Changed("name") {
+			name, _ := cmd.Flags().GetString("name")
+			updates["name"] = name
+		}
+		if cmd.Flags().Changed("host") {
+			host, _ := cmd.Flags().GetString("host")
+			updates["host"] = host
+		}
+		if cmd.Flags().Changed("user") {
+			user, _ := cmd.Flags().GetString("user")
+			updates["user"] = user
+		}
+		if cmd.Flags().Changed("password") {
+			pwd, _ := cmd.Flags().GetString("password")
+			if pwd == "" {
+				pwd, err = password.Generate(24)
+				if err != nil {
+					fmt.Printf("❌ 生成密码失败: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Printf("✅ 生成新密码: %s\n", pwd)
+			}
+			updates["password"] = pwd
+		}
+		if cmd.Flags().Changed("instance-id") {
+			instanceID, _ := cmd.Flags().GetString("instance-id")
+			updates["instance_id"] = instanceID
+		}
+		if cmd.Flags().Changed("hypervisor-host") {
+			hypervisorHost, _ := cmd.Flags().GetString("hypervisor-host")
+			updates["hypervisor_host"] = hypervisorHost
+		}
+		
+		if len(updates) == 0 {
+			fmt.Println("❌ 没有指定要更新的字段")
+			os.Exit(1)
+		}
+		
+		if err := store.Update(serverID, updates); err != nil {
+			fmt.Printf("❌ 更新失败: %v\n", err)
+			os.Exit(1)
+		}
+		
+		fmt.Printf("✅ 已更新服务器: %s\n", serverID)
 	},
 }
 

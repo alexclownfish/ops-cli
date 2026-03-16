@@ -157,3 +157,52 @@ func (s *Store) InitOrVerifyKey() error {
 		return nil
 	})
 }
+// Update 更新服务器信息
+func (s *Store) Update(id string, updates map[string]interface{}) error {
+	return s.db.Update(func(tx *bbolt.Tx) error {
+		b := tx.Bucket([]byte("servers"))
+		data := b.Get([]byte(id))
+		if data == nil {
+			return fmt.Errorf("服务器不存在: %s", id)
+		}
+		
+		var srv Server
+		if err := json.Unmarshal(data, &srv); err != nil {
+			return err
+		}
+		
+		// 更新字段
+		for key, value := range updates {
+			switch key {
+			case "name":
+				srv.Name = value.(string)
+			case "host":
+				srv.Host = value.(string)
+			case "user":
+				srv.User = value.(string)
+			case "password":
+				encrypted, err := Encrypt(value.(string), s.masterKey)
+				if err != nil {
+					return err
+				}
+				srv.PasswordEncrypted = encrypted
+			case "instance_id":
+				srv.InstanceID = value.(string)
+			case "hypervisor_host":
+				srv.HypervisorHost = value.(string)
+			case "hypervisor_port":
+				srv.HypervisorPort = value.(int)
+			case "hypervisor_user":
+				srv.HypervisorUser = value.(string)
+			}
+		}
+		
+		srv.UpdatedAt = time.Now()
+		
+		newData, err := json.Marshal(srv)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(srv.ID), newData)
+	})
+}

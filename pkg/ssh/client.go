@@ -2,9 +2,12 @@ package ssh
 
 import (
 	"fmt"
-	"golang.org/x/crypto/ssh"
+	"io"
 	"os"
+	"path/filepath"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 type Client struct {
@@ -87,4 +90,84 @@ func (c *Client) Close() {
 	if c.client != nil {
 		c.client.Close()
 	}
+}
+
+// UploadFile 通过 SCP 上传单个文件到远程服务器
+func (c *Client) UploadFile(localPath, remotePath string) error {
+	if c.client == nil {
+		return fmt.Errorf("未连接")
+	}
+
+	// 打开本地文件
+	f, err := os.Open(localPath)
+	if err != nil {
+		return fmt.Errorf("打开本地文件失败: %v", err)
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("获取文件信息失败: %v", err)
+	}
+
+	// 创建 SSH session
+	session, err := c.client.NewSession()
+	if err != nil {
+		return fmt.Errorf("创建session失败: %v", err)
+	}
+	defer session.Close()
+
+	// 通过 stdin pipe 发送 SCP 协议数据
+	w, err := session.StdinPipe()
+	if err != nil {
+		return fmt.Errorf("创建stdin pipe失败: %v", err)
+	}
+
+	// 启动远端 scp 接收进程
+	filename := filepath.Base(localPath)
+	if err := session.Start(fmt.Sprintf("scp -t %s", remotePath)); err != nil {
+		return fmt.Errorf("启动远端scp失败: %v", err)
+	}
+
+	// 发送文件头
+	fmt.Fprintf(w, "C%04o %d %s\n", stat.Mode().Perm(), stat.Size(), filename)
+
+	// 发送文件内容
+	if _, err := io.Copy(w, f); err != nil {
+		return fmt.Errorf("发送文件内容失败: %v", err)
+	}
+
+	// 发送结束符
+	fmt.Fprint(w, "\x00")
+	w.Close()
+
+	return session.Wait()
+}
+
+// UploadDir 递归上传目录到远程服务器
+func (c *Client) UploadDir(localDir, remoteDir string) error {
+	return filepath.Walk(localDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// 计算相对路径
+		rel, err := filepath.Rel(localDir, path)
+		if err != nil {
+			return err
+		}
+
+		remotePath := remoteDir + "/" + filepath.ToSlash(rel)
+
+		// 确保远端目录存在
+		remoteFileDir := filepath.Dir(remotePath)
+		if _, err := c.Execute(fmt.Sprintf("mkdir -p %s", remoteFileDir)); err != nil {
+			return fmt.Errorf("创建远端目录失败: %v", err)
+		}
+
+		return c.UploadFile(path, remotePath)
+	})
 }

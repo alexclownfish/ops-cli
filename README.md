@@ -11,6 +11,13 @@
 - 支持密码和密钥认证
 - 支持配置文件批量管理
 - 可配置并发数
+- **联动密码库**：exec/batch 可直接从密码库读取账密，无需手动输入
+- **SSH连接池**：批量执行时复用连接，提升性能
+
+### 文件分发
+- 单机/批量文件分发（SCP）
+- 支持目录递归上传
+- 联动密码库：自动从数据库读取账密
 
 ### 密码管理
 - 24位强密码生成（A-Z、a-z、0-9、#_-@~）
@@ -470,9 +477,53 @@ grep "$(date +%Y-%m-%d)" /var/log/ops-rotate.log
 [2026-03-10 02:00:06] =========================================
 ```
 
+#### 联动密码库执行
+
+```bash
+# 单机：从密码库读取账密，无需手动输入密码
+ops exec "uptime" --from-db vm-001 --master-key $OPS_MASTER_KEY
+
+# 批量：自动加载数据库所有服务器
+ops batch "df -h" --from-db --master-key $OPS_MASTER_KEY
+
+# 批量：指定数据库路径
+ops batch "free -h" --from-db --master-key $OPS_MASTER_KEY --db /path/to/passwords.db
+```
+
 ---
 
-### 5. KeePassXC导出
+### 7. 文件分发
+
+#### 单机分发
+
+```bash
+# 密码认证
+ops scp ./app.tar.gz -H 192.168.1.100 -u root -p password -r /tmp/
+
+# 密钥认证
+ops scp ./app.tar.gz -H 192.168.1.100 -u root -i ~/.ssh/id_rsa -r /opt/app/
+
+# 从密码库读取账密
+ops scp ./app.tar.gz --from-db vm-001 --master-key $OPS_MASTER_KEY -r /tmp/
+```
+
+#### 批量分发
+
+```bash
+# 批量分发到指定服务器列表
+ops scp ./config.yaml -L 192.168.1.100,192.168.1.101 --batch-user root --batch-pass password -r /etc/app/
+
+# 批量分发到密码库所有服务器（推荐）
+ops scp ./app.tar.gz --all-from-db --master-key $OPS_MASTER_KEY -r /tmp/
+
+# 目录递归上传
+ops scp ./dist/ --all-from-db --master-key $OPS_MASTER_KEY -r /opt/app/
+
+# 控制并发数
+ops scp ./app.tar.gz --all-from-db --master-key $OPS_MASTER_KEY -r /tmp/ --parallel 20
+```
+
+---
 
 **导出密码到KeePassXC：**
 

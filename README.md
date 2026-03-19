@@ -479,6 +479,11 @@ grep "$(date +%Y-%m-%d)" /var/log/ops-rotate.log
 
 #### 联动密码库执行
 
+> **参数说明：**
+> - `--from-db <server-id>`：单机，指定数据库中某台服务器 ID，自动读取其账密
+> - `--from-db`（batch专用，不带值）：批量，自动加载数据库中所有服务器
+> - `--all-from-db`（scp专用）：批量，自动加载数据库中所有服务器
+
 ```bash
 # 单机：从密码库读取账密，无需手动输入密码
 ops exec "uptime" --from-db vm-001 --key $OPS_MASTER_KEY

@@ -21,7 +21,7 @@ var (
 	execKeyPass   string
 	execFromDB    string
 	execDBPath    string
-	execMasterKey string
+	execKey string
 
 	// batch 命令参数
 	batchConfigFile string
@@ -50,11 +50,11 @@ var (
 	scpParallel  int
 	scpBatchDB   bool
 	scpDBPath    string
-	scpMasterKey string
+	scpKey string
 
 	// batch 独立 db/key
 	batchFromDBPath string
-	batchMasterKey  string
+	batchKey  string
 )
 
 // loadServerFromDB 从数据库加载服务器信息
@@ -81,7 +81,7 @@ var execCmd = &cobra.Command{
 
 		// 从数据库读取账密
 		if execFromDB != "" {
-			srv, pwd, err := loadServerFromDB(execDBPath, execMasterKey, execFromDB)
+			srv, pwd, err := loadServerFromDB(execDBPath, execKey, execFromDB)
 			if err != nil {
 				fmt.Printf("❌ %v\n", err)
 				os.Exit(1)
@@ -134,11 +134,11 @@ var batchExecCmd = &cobra.Command{
 
 		// 从数据库批量读取
 		if batchFromDB {
-			if batchMasterKey == "" {
+			if batchKey == "" {
 				fmt.Println("❌ 使用 --from-db 需要提供 --key 主密钥")
 				os.Exit(1)
 			}
-			store, err := password.NewStore(batchFromDBPath, batchMasterKey)
+			store, err := password.NewStore(batchFromDBPath, batchKey)
 			if err != nil {
 				fmt.Printf("❌ 打开数据库失败: %v\n", err)
 				os.Exit(1)
@@ -150,7 +150,7 @@ var batchExecCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			store2, _ := password.NewStore(batchFromDBPath, batchMasterKey)
+			store2, _ := password.NewStore(batchFromDBPath, batchKey)
 			defer store2.Close()
 			for _, srv := range servers {
 				_, pwd, err := store2.Get(srv.ID)
@@ -267,11 +267,11 @@ var scpCmd = &cobra.Command{
 
 		// 批量从数据库读取
 		if scpBatchDB {
-			if scpMasterKey == "" {
+			if scpKey == "" {
 				fmt.Println("❌ 使用 --all-from-db 需要提供 --key 主密钥")
 				os.Exit(1)
 			}
-			store, err := password.NewStore(scpDBPath, scpMasterKey)
+			store, err := password.NewStore(scpDBPath, scpKey)
 			if err != nil {
 				fmt.Printf("❌ 打开数据库失败: %v\n", err)
 				os.Exit(1)
@@ -299,7 +299,7 @@ var scpCmd = &cobra.Command{
 			fmt.Printf("📦 从数据库加载 %d 台服务器\n\n", len(targets))
 		} else if scpFromDB != "" {
 			// 单机从数据库读取
-			store, err := password.NewStore(scpDBPath, scpMasterKey)
+			store, err := password.NewStore(scpDBPath, scpKey)
 			if err != nil {
 				fmt.Printf("❌ 打开数据库失败: %v\n", err)
 				os.Exit(1)
@@ -417,7 +417,7 @@ func init() {
 	execCmd.Flags().StringVar(&execKeyPass, "key-pass", "", "私钥密码")
 	execCmd.Flags().StringVar(&execFromDB, "from-db", "", "从数据库读取账密（指定server-id）")
 	execCmd.Flags().StringVar(&execDBPath, "db", "passwords.db", "数据库路径")
-	execCmd.Flags().StringVar(&execMasterKey, "master-key", "", "主密钥（配合--from-db使用）")
+	execCmd.Flags().StringVar(&execKey, "key", "", "主密钥（配合--from-db使用）")
 
 	// batch 命令参数
 	batchExecCmd.Flags().StringVarP(&batchConfigFile, "config", "c", "", "配置文件路径")
@@ -430,7 +430,7 @@ func init() {
 	batchExecCmd.Flags().IntVar(&batchParallel, "parallel", 10, "并发数")
 	batchExecCmd.Flags().BoolVar(&batchFromDB, "from-db", false, "从数据库批量读取所有服务器账密")
 	batchExecCmd.Flags().StringVar(&batchFromDBPath, "db", "passwords.db", "数据库路径")
-	batchExecCmd.Flags().StringVar(&batchMasterKey, "master-key", "", "主密钥（配合--from-db使用）")
+	batchExecCmd.Flags().StringVar(&batchKey, "key", "", "主密钥（配合--from-db使用）")
 
 	// scp 命令参数
 	scpCmd.Flags().StringVarP(&scpHost, "host", "H", "", "服务器地址（单机）")
@@ -448,7 +448,7 @@ func init() {
 	scpCmd.Flags().StringVarP(&scpRemote, "remote", "r", "", "远端目标路径")
 	scpCmd.Flags().IntVar(&scpParallel, "parallel", 10, "并发数")
 	scpCmd.Flags().StringVar(&scpDBPath, "db", "passwords.db", "数据库路径")
-	scpCmd.Flags().StringVar(&scpMasterKey, "master-key", "", "主密钥（配合--from-db使用）")
+	scpCmd.Flags().StringVar(&scpKey, "key", "", "主密钥（配合--from-db使用）")
 	scpCmd.MarkFlagRequired("remote")
 
 	rootCmd.AddCommand(execCmd)

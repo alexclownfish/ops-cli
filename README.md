@@ -481,13 +481,13 @@ grep "$(date +%Y-%m-%d)" /var/log/ops-rotate.log
 
 ```bash
 # 单机：从密码库读取账密，无需手动输入密码
-ops exec "uptime" --from-db vm-001 --master-key $OPS_MASTER_KEY
+ops exec "uptime" --from-db vm-001 --key $OPS_MASTER_KEY
 
 # 批量：自动加载数据库所有服务器
-ops batch "df -h" --from-db --master-key $OPS_MASTER_KEY
+ops batch "df -h" --from-db --key $OPS_MASTER_KEY
 
 # 批量：指定数据库路径
-ops batch "free -h" --from-db --master-key $OPS_MASTER_KEY --db /path/to/passwords.db
+ops batch "free -h" --from-db --key $OPS_MASTER_KEY --db /path/to/passwords.db
 ```
 
 ---
@@ -504,7 +504,7 @@ ops scp ./app.tar.gz -H 192.168.1.100 -u root -p password -r /tmp/
 ops scp ./app.tar.gz -H 192.168.1.100 -u root -i ~/.ssh/id_rsa -r /opt/app/
 
 # 从密码库读取账密
-ops scp ./app.tar.gz --from-db vm-001 --master-key $OPS_MASTER_KEY -r /tmp/
+ops scp ./app.tar.gz --from-db vm-001 --key $OPS_MASTER_KEY -r /tmp/
 ```
 
 #### 批量分发
@@ -514,13 +514,13 @@ ops scp ./app.tar.gz --from-db vm-001 --master-key $OPS_MASTER_KEY -r /tmp/
 ops scp ./config.yaml -L 192.168.1.100,192.168.1.101 --batch-user root --batch-pass password -r /etc/app/
 
 # 批量分发到密码库所有服务器（推荐）
-ops scp ./app.tar.gz --all-from-db --master-key $OPS_MASTER_KEY -r /tmp/
+ops scp ./app.tar.gz --all-from-db --key $OPS_MASTER_KEY -r /tmp/
 
 # 目录递归上传
-ops scp ./dist/ --all-from-db --master-key $OPS_MASTER_KEY -r /opt/app/
+ops scp ./dist/ --all-from-db --key $OPS_MASTER_KEY -r /opt/app/
 
 # 控制并发数
-ops scp ./app.tar.gz --all-from-db --master-key $OPS_MASTER_KEY -r /tmp/ --parallel 20
+ops scp ./app.tar.gz --all-from-db --key $OPS_MASTER_KEY -r /tmp/ --parallel 20
 ```
 
 ---
